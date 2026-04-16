@@ -163,3 +163,29 @@ export const statValueStyle = {
   color: "#030c2e",
   fontWeight: 700,
 };
+
+export const navBarStyle = {
+  display: "flex",
+  gap: 10,
+  flexWrap: "wrap",
+  marginBottom: 22,
+};
+
+export const navButtonStyle = {
+  padding: "12px 18px",
+  borderRadius: 999,
+  border: "1px solid rgba(7, 28, 116, 0.14)",
+  background: "rgba(255,255,255,0.72)",
+  color: "#071c74",
+  cursor: "pointer",
+  fontWeight: 700,
+  letterSpacing: "0.02em",
+  boxShadow: "0 8px 18px rgba(3, 12, 46, 0.06)",
+};
+
+export const navButtonActiveStyle = {
+  background: "linear-gradient(135deg, #071c74 0%, #030c2e 100%)",
+  color: "#fff",
+  border: "1px solid transparent",
+  boxShadow: "0 10px 22px rgba(3, 12, 46, 0.18)",
+};

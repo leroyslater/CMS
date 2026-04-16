@@ -1,10 +1,12 @@
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import AddStudentCard from "./components/AddStudentCard";
+import AttendanceImportCard from "./components/AttendanceImportCard";
 import AppHeader from "./components/AppHeader";
 import AuthScreen from "./components/AuthScreen";
 import ChronicleImportCard from "./components/ChronicleImportCard";
 import ConfigScreen from "./components/ConfigScreen";
 import CreateSessionCard from "./components/CreateSessionCard";
+import DashboardHome from "./components/DashboardHome";
 import DashboardStats from "./components/DashboardStats";
 import RepeatOffendersCard from "./components/RepeatOffendersCard";
 import SessionRollCard from "./components/SessionRollCard";
@@ -15,6 +17,9 @@ import { useDetentionData } from "./hooks/useDetentionData";
 import { fetchTableRows, upsertTableRows } from "./lib/supabaseRest";
 import { supabase } from "./lib/supabaseClient";
 import {
+  navBarStyle,
+  navButtonActiveStyle,
+  navButtonStyle,
   pageStyle,
   statusErrorStyle,
   statusSuccessStyle,
@@ -54,12 +59,20 @@ export default function App() {
   } = useDetentionData(authSession, todayString);
 
   const [chronicleRows, setChronicleRows] = useState([]);
+  const [attendanceRows, setAttendanceRows] = useState([]);
   const [selectedChronicleKeys, setSelectedChronicleKeys] = useState([]);
   const [selectedChronicleKey, setSelectedChronicleKey] = useState("");
   const [chronicleSearch, setChronicleSearch] = useState("");
   const [chronicleYearFilter, setChronicleYearFilter] = useState("");
   const [chronicleHomegroupFilter, setChronicleHomegroupFilter] = useState("");
   const [chronicleOnly3Plus, setChronicleOnly3Plus] = useState(false);
+  const [selectedAttendanceKeys, setSelectedAttendanceKeys] = useState([]);
+  const [selectedAttendanceKey, setSelectedAttendanceKey] = useState("");
+  const [attendanceSearch, setAttendanceSearch] = useState("");
+  const [attendanceYearFilter, setAttendanceYearFilter] = useState("");
+  const [attendanceHomegroupFilter, setAttendanceHomegroupFilter] = useState("");
+  const [attendanceOnly3Plus, setAttendanceOnly3Plus] = useState(false);
+  const [attendanceSessionId, setAttendanceSessionId] = useState("");
 
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -77,12 +90,36 @@ export default function App() {
   const [attendanceUpdatingId, setAttendanceUpdatingId] = useState(null);
   const [sessionSaving, setSessionSaving] = useState(false);
   const [entrySavingId, setEntrySavingId] = useState(null);
+  const [todos, setTodos] = useState([]);
+  const [creatingTodo, setCreatingTodo] = useState(false);
+  const [updatingTodoId, setUpdatingTodoId] = useState(null);
+  const [deletingTodoId, setDeletingTodoId] = useState(null);
   const [message, setMessage] = useState("");
+  const [activePage, setActivePage] = useState("dashboard");
   const error = authError || dataError;
   const currentEntry = newEntry.sessionId
     ? newEntry
     : { ...newEntry, sessionId: selectedSessionId };
   const isSupervisor = (profile?.role || "coordinator") === "supervisor";
+  const pages = useMemo(
+    () =>
+      isSupervisor
+        ? [{ id: "sessions", label: "Sessions" }]
+        : [
+            { id: "dashboard", label: "Dashboard" },
+            { id: "sessions", label: "Sessions" },
+            { id: "chronicle", label: "Chronicle" },
+            { id: "attendance", label: "Attendance" },
+            { id: "students", label: "Student Upload" },
+          ],
+    [isSupervisor]
+  );
+
+  useEffect(() => {
+    if (!pages.some((page) => page.id === activePage)) {
+      setActivePage(pages[0].id);
+    }
+  }, [activePage, pages]);
 
   function clearError() {
     setAuthError("");
@@ -226,10 +263,7 @@ export default function App() {
 
     try {
       const text = await file.text();
-      const rows = text
-        .split(/\r?\n/)
-        .map((row) => row.trim())
-        .filter(Boolean);
+      const rows = splitCsvRecords(text);
 
       if (rows.length < 2) {
         setDataError(
@@ -455,6 +489,81 @@ export default function App() {
     }
   }
 
+  async function handleAddTodo(taskText, dueDate) {
+    clearError();
+    setMessage("");
+    setCreatingTodo(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("todo_items")
+        .insert([{ task_text: taskText, is_done: false, due_date: dueDate }])
+        .select()
+        .single();
+
+      if (error) {
+        setDataError(error.message);
+        return false;
+      }
+
+      if (data) {
+        setTodos((prev) => [data, ...prev]);
+        setMessage("Task added.");
+      }
+
+      return true;
+    } finally {
+      setCreatingTodo(false);
+    }
+  }
+
+  async function handleToggleTodo(todoId, isDone) {
+    clearError();
+    setMessage("");
+    setUpdatingTodoId(todoId);
+
+    try {
+      const { error } = await supabase
+        .from("todo_items")
+        .update({ is_done: !isDone })
+        .eq("id", todoId);
+
+      if (error) {
+        setDataError(error.message);
+        return;
+      }
+
+      setTodos((prev) =>
+        prev.map((todo) =>
+          todo.id === todoId ? { ...todo, is_done: !isDone } : todo
+        )
+      );
+      setMessage("Task updated.");
+    } finally {
+      setUpdatingTodoId(null);
+    }
+  }
+
+  async function handleDeleteTodo(todoId) {
+    clearError();
+    setMessage("");
+    setDeletingTodoId(todoId);
+
+    try {
+      const { error } = await supabase.from("todo_items").delete().eq("id", todoId);
+
+      if (error) {
+        setDataError(error.message);
+        return;
+      }
+
+      setTodos((prev) => prev.filter((todo) => todo.id !== todoId));
+      setMessage("Task removed.");
+    } finally {
+      setDeletingTodoId(null);
+    }
+  }
+
   async function handleChronicleUpload(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -464,7 +573,7 @@ export default function App() {
 
     try {
       const text = await file.text();
-      const rows = text.split(/\r?\n/).filter(Boolean);
+      const rows = splitCsvRecords(text);
 
       if (rows.length < 2) {
         setDataError(
@@ -493,17 +602,28 @@ export default function App() {
         return;
       }
 
+      const dedupedChroniclePayload = Array.from(
+        chroniclePayload.reduce((map, record) => {
+          map.set(record.id, record);
+          return map;
+        }, new Map()).values()
+      );
+      const duplicateCount = chroniclePayload.length - dedupedChroniclePayload.length;
+
       const missingStudentCodes = Array.from(
         new Set(
-          chroniclePayload
+          dedupedChroniclePayload
             .map((record) => record.student_code)
             .filter((studentCode) => !studentLookupByCode[studentCode])
         )
       );
+      const validChroniclePayload = dedupedChroniclePayload.filter(
+        (record) => studentLookupByCode[record.student_code]
+      );
 
-      if (missingStudentCodes.length > 0) {
+      if (validChroniclePayload.length === 0) {
         setDataError(
-          `Chronicle import skipped because these student codes are missing from Students: ${missingStudentCodes.join(", ")}`
+          `Chronicle import could not save any rows. Missing student codes: ${missingStudentCodes.join(", ")}`
         );
         return;
       }
@@ -514,10 +634,11 @@ export default function App() {
         return;
       }
 
+      const existingIds = new Set(chronicleRows.map((row) => row.id));
       try {
         await upsertTableRows(
           "chronicle_entries",
-          chroniclePayload,
+          validChroniclePayload,
           accessToken,
           "id"
         );
@@ -534,15 +655,144 @@ export default function App() {
       }
 
       const parsedRows = await loadChronicleRows(accessToken);
+      const insertedCount = validChroniclePayload.filter(
+        (record) => !existingIds.has(record.id)
+      ).length;
+      const updatedCount = validChroniclePayload.length - insertedCount;
+      const skippedCount = missingStudentCodes.length;
+      const duplicateMessage =
+        duplicateCount > 0
+          ? ` Collapsed ${duplicateCount} duplicate Chronicle row${duplicateCount === 1 ? "" : "s"} in the upload.`
+          : "";
+      const skippedMessage =
+        skippedCount > 0
+          ? ` Skipped ${skippedCount} missing student code${skippedCount === 1 ? "" : "s"}: ${missingStudentCodes.join(", ")}.`
+          : "";
       setSelectedChronicleKeys([]);
       setSelectedChronicleKey("");
       setMessage(
-        `Saved ${chroniclePayload.length} Chronicle records and loaded ${parsedRows.length} minor behaviour records.`
+        `Chronicle import complete: ${insertedCount} new, ${updatedCount} updated, ${parsedRows.length} total loaded.${duplicateMessage}${skippedMessage}`
       );
     } catch (err) {
       setDataError(err.message || "Failed to parse Chronicle file.");
     } finally {
       e.target.value = "";
+    }
+  }
+
+  async function handleAttendanceUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    clearError();
+    setMessage("");
+
+    try {
+      const text = await file.text();
+      const rows = splitCsvRecords(text);
+
+      if (rows.length < 2) {
+        setDataError(
+          "Attendance CSV must include a header row and at least one record row."
+        );
+        return;
+      }
+
+      const headers = splitCsvRow(rows[0]).map(normalizeCsvHeader);
+      const data = rows.slice(1).map((row) => {
+        const values = splitCsvRow(row);
+        const obj = {};
+        headers.forEach((header, index) => {
+          obj[header] = values[index] || "";
+        });
+        return obj;
+      });
+
+      const attendancePayload = data
+        .map(createAttendanceRecord)
+        .filter((record) => record && record.id && record.student_code);
+
+      if (attendancePayload.length === 0) {
+        setDataError("No valid late attendance rows found in the CSV file.");
+        return;
+      }
+
+      const dedupedAttendancePayload = Array.from(
+        attendancePayload.reduce((map, record) => {
+          map.set(record.id, record);
+          return map;
+        }, new Map()).values()
+      );
+      const duplicateCount =
+        attendancePayload.length - dedupedAttendancePayload.length;
+
+      const missingStudentCodes = Array.from(
+        new Set(
+          dedupedAttendancePayload
+            .map((record) => record.student_code)
+            .filter((studentCode) => !studentLookupByCode[studentCode])
+        )
+      );
+      const validAttendancePayload = dedupedAttendancePayload.filter(
+        (record) => studentLookupByCode[record.student_code]
+      );
+
+      if (validAttendancePayload.length === 0) {
+        setDataError(
+          `Attendance import could not save any rows. Missing student codes: ${missingStudentCodes.join(", ")}`
+        );
+        return;
+      }
+
+      const accessToken = authSession?.access_token;
+      if (!accessToken) {
+        setDataError("You need to be signed in before importing attendance data.");
+        return;
+      }
+
+      const existingIds = new Set(attendanceRows.map((row) => row.id));
+      try {
+        await upsertTableRows(
+          "attendance_entries",
+          validAttendancePayload,
+          accessToken,
+          "id"
+        );
+      } catch (err) {
+        const message = err.message || "Failed to save attendance records.";
+        setDataError(
+          message.includes("attendance_entries") ||
+            message.includes("Could not find the table") ||
+            message.includes("relation")
+            ? "Attendance table missing. Run database/attendance_entries.sql in Supabase first."
+            : message
+        );
+        return;
+      }
+
+      const parsedRows = await loadAttendanceRows(accessToken);
+      const insertedCount = validAttendancePayload.filter(
+        (record) => !existingIds.has(record.id)
+      ).length;
+      const updatedCount = validAttendancePayload.length - insertedCount;
+      const skippedCount = missingStudentCodes.length;
+      const duplicateMessage =
+        duplicateCount > 0
+          ? ` Collapsed ${duplicateCount} duplicate attendance row${duplicateCount === 1 ? "" : "s"} in the upload.`
+          : "";
+      const skippedMessage =
+        skippedCount > 0
+          ? ` Skipped ${skippedCount} missing student code${skippedCount === 1 ? "" : "s"}: ${missingStudentCodes.join(", ")}.`
+          : "";
+      setSelectedAttendanceKeys([]);
+      setSelectedAttendanceKey("");
+      setMessage(
+        `Attendance import complete: ${insertedCount} new, ${updatedCount} updated, ${parsedRows.length} total loaded.${duplicateMessage}${skippedMessage}`
+      );
+    } catch (err) {
+      setDataError(err.message || "Failed to parse attendance file.");
+    } finally {
+      event.target.value = "";
     }
   }
 
@@ -575,6 +825,34 @@ export default function App() {
     );
   }, [chronicleRows]);
 
+  const attendanceGrouped = useMemo(() => {
+    const map = {};
+
+    attendanceRows.forEach((row) => {
+      const key = `${row.studentCode}__${row.weekKey}`;
+      if (!map[key]) {
+        map[key] = {
+          key,
+          name: row.studentName,
+          studentName: row.studentName,
+          studentCode: row.studentCode,
+          count: 0,
+          rows: [],
+          yearLevel: row.yearLevel,
+          homegroup: row.homegroup,
+          weekKey: row.weekKey,
+          weekLabel: row.weekLabel,
+        };
+      }
+      map[key].count += 1;
+      map[key].rows.push(row);
+    });
+
+    return Object.values(map).sort(
+      (a, b) => b.count - a.count || a.name.localeCompare(b.name)
+    );
+  }, [attendanceRows]);
+
   const filteredChronicle = useMemo(() => {
     return chronicleGrouped.filter((g) => {
       if (chronicleOnly3Plus && g.count < 3) return false;
@@ -600,12 +878,48 @@ export default function App() {
     chronicleOnly3Plus,
   ]);
 
+  const filteredAttendance = useMemo(() => {
+    return attendanceGrouped.filter((group) => {
+      if (attendanceOnly3Plus && group.count < 3) return false;
+      if (
+        attendanceSearch &&
+        !group.name.toLowerCase().includes(attendanceSearch.toLowerCase())
+      ) {
+        return false;
+      }
+      if (attendanceYearFilter && group.yearLevel !== attendanceYearFilter) {
+        return false;
+      }
+      if (
+        attendanceHomegroupFilter &&
+        group.homegroup !== attendanceHomegroupFilter
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [
+    attendanceGrouped,
+    attendanceOnly3Plus,
+    attendanceSearch,
+    attendanceYearFilter,
+    attendanceHomegroupFilter,
+  ]);
+
   const chronicleYearOptions = useMemo(
     () =>
       Array.from(
         new Set(chronicleGrouped.map((g) => g.yearLevel).filter(Boolean))
       ).sort(),
     [chronicleGrouped]
+  );
+
+  const attendanceYearOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(attendanceGrouped.map((group) => group.yearLevel).filter(Boolean))
+      ).sort(),
+    [attendanceGrouped]
   );
 
   const chronicleHomegroupOptions = useMemo(
@@ -616,9 +930,22 @@ export default function App() {
     [chronicleGrouped]
   );
 
+  const attendanceHomegroupOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(attendanceGrouped.map((group) => group.homegroup).filter(Boolean))
+      ).sort(),
+    [attendanceGrouped]
+  );
+
   const selectedChronicleGroup = useMemo(
     () => chronicleGrouped.find((g) => g.key === selectedChronicleKey) || null,
     [chronicleGrouped, selectedChronicleKey]
+  );
+
+  const selectedAttendanceGroup = useMemo(
+    () => attendanceGrouped.find((group) => group.key === selectedAttendanceKey) || null,
+    [attendanceGrouped, selectedAttendanceKey]
   );
 
   const selectedSession = useMemo(
@@ -660,9 +987,9 @@ export default function App() {
         ascending: false,
       });
 
-      const parsedRows = (chronicleData || [])
-        .map((record) => mapChronicleRecordToView(record, studentLookupByCode))
-        .filter((row) => isMinorChronicle(row.chronicleType));
+      const parsedRows = (chronicleData || []).map((record) =>
+        mapChronicleRecordToView(record, studentLookupByCode)
+      );
 
       setChronicleRows(parsedRows);
       return parsedRows;
@@ -674,13 +1001,64 @@ export default function App() {
 
   const loadChronicleRowsEvent = useEffectEvent(loadChronicleRows);
 
+  async function loadTodos(accessToken = authSession?.access_token) {
+    if (!accessToken) {
+      setTodos([]);
+      return [];
+    }
+
+    try {
+      const todoData = await fetchTableRows("todo_items", accessToken, {
+        column: "created_at",
+        ascending: false,
+      });
+      const safeTodos = todoData || [];
+      setTodos(safeTodos);
+      return safeTodos;
+    } catch (err) {
+      setDataError(err.message || "Failed to load tasks.");
+      return [];
+    }
+  }
+
+  const loadTodosEvent = useEffectEvent(loadTodos);
+
+  async function loadAttendanceRows(accessToken = authSession?.access_token) {
+    if (!accessToken) {
+      setAttendanceRows([]);
+      return [];
+    }
+
+    try {
+      const attendanceData = await fetchTableRows("attendance_entries", accessToken, {
+        column: "start_at",
+        ascending: false,
+      });
+
+      const parsedRows = (attendanceData || []).map((record) =>
+        mapAttendanceRecordToView(record, studentLookupByCode)
+      );
+      setAttendanceRows(parsedRows);
+      return parsedRows;
+    } catch (err) {
+      setDataError(err.message || "Failed to load attendance records.");
+      return [];
+    }
+  }
+
+  const loadAttendanceRowsEvent = useEffectEvent(loadAttendanceRows);
+
   useEffect(() => {
     if (!authSession?.access_token) {
       setChronicleRows([]);
+      setAttendanceRows([]);
+      setTodos([]);
       return;
     }
 
     loadChronicleRowsEvent(authSession.access_token);
+    loadAttendanceRowsEvent(authSession.access_token);
+    loadTodosEvent(authSession.access_token);
   }, [authSession?.access_token, studentLookupByCode]);
 
   function getChronicleStatus(group) {
@@ -692,6 +1070,25 @@ export default function App() {
 
     if (existing) {
       const session = sessions.find((s) => s.id === existing.session_id);
+      return {
+        assigned: true,
+        label: session ? `Assigned to ${session.name}` : "Assigned",
+      };
+    }
+
+    if (group.count >= 3) return { assigned: false, label: "Ready to assign" };
+    return { assigned: false, label: "Below threshold" };
+  }
+
+  function getAttendanceStatus(group) {
+    const existing = entries.find(
+      (entry) =>
+        entry.student_name === group.studentName &&
+        entry.reason === `Attendance threshold reached (${group.weekLabel})`
+    );
+
+    if (existing) {
+      const session = sessions.find((session) => session.id === existing.session_id);
       return {
         assigned: true,
         label: session ? `Assigned to ${session.name}` : "Assigned",
@@ -747,6 +1144,48 @@ export default function App() {
     return false;
   }
 
+  async function assignAttendanceGroupToSession(group) {
+    clearError();
+
+    if (!attendanceSessionId) {
+      setDataError("Choose a detention session first.");
+      return false;
+    }
+
+    const duplicate = entries.find(
+      (entry) =>
+        entry.student_name === group.studentName &&
+        entry.reason === `Attendance threshold reached (${group.weekLabel})`
+    );
+
+    if (duplicate) return false;
+
+    const payload = {
+      session_id: attendanceSessionId,
+      student_name: group.studentName,
+      year_level: group.yearLevel,
+      homegroup: group.homegroup,
+      reason: `Attendance threshold reached (${group.weekLabel})`,
+      issued_by: "Attendance import",
+      attendance: "Unmarked",
+    };
+
+    const { data, error } = await supabase.from("entries").insert([payload]).select();
+
+    if (error) {
+      setDataError(error.message);
+      return false;
+    }
+
+    if (data?.[0]) {
+      prependEntry(data[0]);
+      setSelectedStudent(group.studentName);
+      return true;
+    }
+
+    return false;
+  }
+
   async function assignSelectedChronicleGroups() {
     clearError();
     setMessage("");
@@ -781,8 +1220,50 @@ export default function App() {
     );
   }
 
+  async function assignSelectedAttendanceGroups() {
+    clearError();
+    setMessage("");
+
+    if (!attendanceSessionId) {
+      setDataError("Choose a detention session first.");
+      return;
+    }
+
+    const groups = filteredAttendance.filter(
+      (group) =>
+        selectedAttendanceKeys.includes(group.key) &&
+        group.count >= 3 &&
+        !getAttendanceStatus(group).assigned
+    );
+
+    if (groups.length === 0) {
+      setDataError("Select at least one ready attendance candidate.");
+      return;
+    }
+
+    let assigned = 0;
+    for (const group of groups) {
+      const ok = await assignAttendanceGroupToSession(group);
+      if (ok) assigned += 1;
+    }
+
+    setMessage(
+      assigned > 0
+        ? `Assigned ${assigned} attendance candidates.`
+        : "No new attendance candidates were assigned."
+    );
+  }
+
   function toggleChronicleSelection(key) {
     setSelectedChronicleKeys((prev) =>
+      prev.includes(key)
+        ? prev.filter((item) => item !== key)
+        : [...prev, key]
+    );
+  }
+
+  function toggleAttendanceSelection(key) {
+    setSelectedAttendanceKeys((prev) =>
       prev.includes(key)
         ? prev.filter((item) => item !== key)
         : [...prev, key]
@@ -843,9 +1324,62 @@ export default function App() {
         value: repeatStudents.length,
         note: "Students with multiple records",
       },
+      {
+        label: "Late Arrivals",
+        value: attendanceRows.length,
+        note: "Attendance incidents imported",
+      },
     ],
-    [students.length, sessions.length, entries.length, repeatStudents.length]
+    [
+      students.length,
+      sessions.length,
+      entries.length,
+      repeatStudents.length,
+      attendanceRows.length,
+    ]
   );
+
+  const topChronicleStudents = useMemo(() => {
+    const counts = {};
+    chronicleRows.forEach((row) => {
+      if (!row.studentName) return;
+      counts[row.studentName] = (counts[row.studentName] || 0) + 1;
+    });
+
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+      .slice(0, 5);
+  }, [chronicleRows]);
+
+  const topDetentionStudents = useMemo(
+    () =>
+      Object.entries(
+        entries.reduce((counts, entry) => {
+          if (entry.student_name) {
+            counts[entry.student_name] = (counts[entry.student_name] || 0) + 1;
+          }
+          return counts;
+        }, {})
+      )
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+        .slice(0, 5),
+    [entries]
+  );
+
+  const topAttendanceStudents = useMemo(() => {
+    const counts = {};
+    attendanceRows.forEach((row) => {
+      if (!row.studentName) return;
+      counts[row.studentName] = (counts[row.studentName] || 0) + 1;
+    });
+
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+      .slice(0, 5);
+  }, [attendanceRows]);
 
   if (!supabase) {
     return <ConfigScreen />;
@@ -901,83 +1435,156 @@ export default function App() {
         />
       ) : (
         <>
-
-          <DashboardStats stats={dashboardStats} />
-
-          <div style={twoColStyle}>
-            <CreateSessionCard
-              newSession={newSession}
-              setNewSession={setNewSession}
-              handleCreateSession={handleCreateSession}
-            />
-            <AddStudentCard
-              handleAddEntry={handleAddEntry}
-              newEntry={currentEntry}
-              setNewEntry={setNewEntry}
-              sessions={sessions}
-              studentSearch={studentSearch}
-              setStudentSearch={setStudentSearch}
-              studentDropdownOpen={studentDropdownOpen}
-              setStudentDropdownOpen={setStudentDropdownOpen}
-              filteredStudents={filteredStudents}
-            />
+          <div style={navBarStyle}>
+            {pages.map((page) => (
+              <button
+                key={page.id}
+                type="button"
+                style={{
+                  ...navButtonStyle,
+                  ...(activePage === page.id ? navButtonActiveStyle : {}),
+                }}
+                onClick={() => setActivePage(page.id)}
+              >
+                {page.label}
+              </button>
+            ))}
           </div>
 
-          <SessionRollCard
-            selectedSessionId={selectedSessionId}
-            setSelectedSessionId={setSelectedSessionId}
-            sessions={sessions}
-            selectedSession={selectedSession}
-            selectedSessionEntries={selectedSessionEntries}
-            setSelectedStudent={setSelectedStudent}
-            onUpdateSession={handleUpdateSession}
-            onDeleteSession={handleDeleteSession}
-            sessionSaving={sessionSaving}
-            onUpdateEntry={handleUpdateEntry}
-            onDeleteEntry={handleDeleteEntry}
-            entrySavingId={entrySavingId}
-          />
+          {activePage === "dashboard" ? (
+            <DashboardHome
+              stats={dashboardStats}
+              topChronicleStudents={topChronicleStudents}
+              topAttendanceStudents={topAttendanceStudents}
+              topDetentionStudents={topDetentionStudents}
+              todos={todos.map((todo) => ({
+                id: todo.id,
+                text: todo.task_text,
+                done: todo.is_done,
+                dueDate: todo.due_date,
+                isOverdue: isTodoOverdue(todo.due_date, todo.is_done),
+              }))}
+              creatingTodo={creatingTodo}
+              updatingTodoId={updatingTodoId}
+              deletingTodoId={deletingTodoId}
+              onAddTodo={handleAddTodo}
+              onToggleTodo={handleToggleTodo}
+              onDeleteTodo={handleDeleteTodo}
+              setSelectedStudent={setSelectedStudent}
+            />
+          ) : null}
 
-          <ChronicleImportCard
-            handleChronicleUpload={handleChronicleUpload}
-            chronicleSearch={chronicleSearch}
-            setChronicleSearch={setChronicleSearch}
-            chronicleYearFilter={chronicleYearFilter}
-            setChronicleYearFilter={setChronicleYearFilter}
-            chronicleHomegroupFilter={chronicleHomegroupFilter}
-            setChronicleHomegroupFilter={setChronicleHomegroupFilter}
-            chronicleOnly3Plus={chronicleOnly3Plus}
-            setChronicleOnly3Plus={setChronicleOnly3Plus}
-            chronicleSessionId={chronicleSessionId}
-            setChronicleSessionId={setChronicleSessionId}
-            sessions={sessions}
-            chronicleYearOptions={chronicleYearOptions}
-            chronicleHomegroupOptions={chronicleHomegroupOptions}
-            assignSelectedChronicleGroups={assignSelectedChronicleGroups}
-            filteredChronicle={filteredChronicle}
-            selectedChronicleKeys={selectedChronicleKeys}
-            toggleChronicleSelection={toggleChronicleSelection}
-            setSelectedChronicleKey={setSelectedChronicleKey}
-            getChronicleStatus={getChronicleStatus}
-            assignChronicleGroupToSession={assignChronicleGroupToSession}
-            selectedChronicleGroup={selectedChronicleGroup}
-          />
+          {activePage === "sessions" ? (
+            <>
+              <DashboardStats stats={dashboardStats} />
 
-          <RepeatOffendersCard
-            repeatStudents={repeatStudents}
-            getStudentFlag={getStudentFlag}
-            setSelectedStudent={setSelectedStudent}
-          />
+              <div style={twoColStyle}>
+                <CreateSessionCard
+                  newSession={newSession}
+                  setNewSession={setNewSession}
+                  handleCreateSession={handleCreateSession}
+                />
+                <AddStudentCard
+                  handleAddEntry={handleAddEntry}
+                  newEntry={currentEntry}
+                  setNewEntry={setNewEntry}
+                  sessions={sessions}
+                  studentSearch={studentSearch}
+                  setStudentSearch={setStudentSearch}
+                  studentDropdownOpen={studentDropdownOpen}
+                  setStudentDropdownOpen={setStudentDropdownOpen}
+                  filteredStudents={filteredStudents}
+                />
+              </div>
 
-          <StudentHistoryCard
-            selectedStudent={selectedStudent}
-            getStudentHistory={getStudentHistory}
-          />
+              <SessionRollCard
+                selectedSessionId={selectedSessionId}
+                setSelectedSessionId={setSelectedSessionId}
+                sessions={sessions}
+                selectedSession={selectedSession}
+                selectedSessionEntries={selectedSessionEntries}
+                setSelectedStudent={setSelectedStudent}
+                onUpdateSession={handleUpdateSession}
+                onDeleteSession={handleDeleteSession}
+                sessionSaving={sessionSaving}
+                onUpdateEntry={handleUpdateEntry}
+                onDeleteEntry={handleDeleteEntry}
+                entrySavingId={entrySavingId}
+              />
 
-          <StudentUploadCard
-            handleStudentUpload={handleStudentUpload}
-            studentCount={students.length}
-          />
+              <RepeatOffendersCard
+                repeatStudents={repeatStudents}
+                getStudentFlag={getStudentFlag}
+                setSelectedStudent={setSelectedStudent}
+              />
+
+              <StudentHistoryCard
+                selectedStudent={selectedStudent}
+                getStudentHistory={getStudentHistory}
+              />
+            </>
+          ) : null}
+
+          {activePage === "chronicle" ? (
+            <ChronicleImportCard
+              handleChronicleUpload={handleChronicleUpload}
+              chronicleSearch={chronicleSearch}
+              setChronicleSearch={setChronicleSearch}
+              chronicleYearFilter={chronicleYearFilter}
+              setChronicleYearFilter={setChronicleYearFilter}
+              chronicleHomegroupFilter={chronicleHomegroupFilter}
+              setChronicleHomegroupFilter={setChronicleHomegroupFilter}
+              chronicleOnly3Plus={chronicleOnly3Plus}
+              setChronicleOnly3Plus={setChronicleOnly3Plus}
+              chronicleSessionId={chronicleSessionId}
+              setChronicleSessionId={setChronicleSessionId}
+              sessions={sessions}
+              chronicleYearOptions={chronicleYearOptions}
+              chronicleHomegroupOptions={chronicleHomegroupOptions}
+              assignSelectedChronicleGroups={assignSelectedChronicleGroups}
+              filteredChronicle={filteredChronicle}
+              selectedChronicleKeys={selectedChronicleKeys}
+              toggleChronicleSelection={toggleChronicleSelection}
+              setSelectedChronicleKey={setSelectedChronicleKey}
+              getChronicleStatus={getChronicleStatus}
+              assignChronicleGroupToSession={assignChronicleGroupToSession}
+              selectedChronicleGroup={selectedChronicleGroup}
+            />
+          ) : null}
+
+          {activePage === "attendance" ? (
+            <AttendanceImportCard
+              handleAttendanceUpload={handleAttendanceUpload}
+              attendanceSearch={attendanceSearch}
+              setAttendanceSearch={setAttendanceSearch}
+              attendanceYearFilter={attendanceYearFilter}
+              setAttendanceYearFilter={setAttendanceYearFilter}
+              attendanceHomegroupFilter={attendanceHomegroupFilter}
+              setAttendanceHomegroupFilter={setAttendanceHomegroupFilter}
+              attendanceOnly3Plus={attendanceOnly3Plus}
+              setAttendanceOnly3Plus={setAttendanceOnly3Plus}
+              attendanceSessionId={attendanceSessionId}
+              setAttendanceSessionId={setAttendanceSessionId}
+              sessions={sessions}
+              attendanceYearOptions={attendanceYearOptions}
+              attendanceHomegroupOptions={attendanceHomegroupOptions}
+              assignSelectedAttendanceGroups={assignSelectedAttendanceGroups}
+              filteredAttendance={filteredAttendance}
+              selectedAttendanceKeys={selectedAttendanceKeys}
+              toggleAttendanceSelection={toggleAttendanceSelection}
+              setSelectedAttendanceKey={setSelectedAttendanceKey}
+              getAttendanceStatus={getAttendanceStatus}
+              assignAttendanceGroupToSession={assignAttendanceGroupToSession}
+              selectedAttendanceGroup={selectedAttendanceGroup}
+            />
+          ) : null}
+
+          {activePage === "students" ? (
+            <StudentUploadCard
+              handleStudentUpload={handleStudentUpload}
+              studentCount={students.length}
+            />
+          ) : null}
         </>
       )}
     </div>
@@ -1010,6 +1617,48 @@ function splitCsvRow(row) {
 
   values.push(current);
   return values.map((value) => value.trim());
+}
+
+function splitCsvRecords(text) {
+  const records = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (char === '"') {
+      current += char;
+      if (inQuotes && next === '"') {
+        current += next;
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (current.trim()) {
+        records.push(current.replace(/\r$/, ""));
+      }
+
+      current = "";
+      if (char === "\r" && next === "\n") {
+        i += 1;
+      }
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current.trim()) {
+    records.push(current.replace(/\r$/, ""));
+  }
+
+  return records;
 }
 
 function normalizeCsvHeader(header) {
@@ -1113,6 +1762,40 @@ function createChronicleRecord(row) {
   };
 }
 
+function createAttendanceRecord(row) {
+  const studentCode = normalizeStudentCode(
+    getChronicleValue(row, "StudentCode", "Student Code")
+  );
+  const startTimeText = getChronicleValue(row, "StartTime", "Start Time");
+  const arrivalTimeText = getChronicleValue(row, "ArrivalTime", "Arrival Time");
+  const startDate = parseAttendanceDateTime(startTimeText);
+  const arrivalDate = parseAttendanceArrivalTime(arrivalTimeText, startDate);
+
+  if (!studentCode || !startDate || !arrivalDate || arrivalDate <= startDate) {
+    return null;
+  }
+
+  const minutesLate = Math.round((arrivalDate - startDate) / 60000);
+  const period = getChronicleValue(row, "Period");
+  const activityCode = getChronicleValue(row, "ActivityCode", "Activity Code");
+
+  return {
+    id: `${studentCode}-${formatDateTimeForSql(startDate)}-${period || activityCode || "late"}`,
+    student_code: studentCode,
+    start_time_text: startTimeText || "",
+    start_at: formatDateTimeForSql(startDate),
+    arrival_time_text: arrivalTimeText || "",
+    arrival_at: formatDateTimeForSql(arrivalDate),
+    period: period || "",
+    activity_code: activityCode || "",
+    activity_name: getChronicleValue(row, "ActivityName", "Activity Name") || "",
+    teacher: getChronicleValue(row, "Teacher") || "",
+    minutes_late: minutesLate,
+    week_key: getFridayWeekKey(startDate),
+    week_label: getFridayWeekLabel(startDate),
+  };
+}
+
 function mapChronicleRecordToView(record, studentLookupByCode = {}) {
   const occurredDate = record.occurred_at
     ? new Date(record.occurred_at)
@@ -1140,6 +1823,36 @@ function mapChronicleRecordToView(record, studentLookupByCode = {}) {
     chronicleType: record.chronicle_type || "",
     details: record.details || "",
     originalPublisher: record.original_publisher || "",
+  };
+}
+
+function mapAttendanceRecordToView(record, studentLookupByCode = {}) {
+  const startDate = record.start_at
+    ? new Date(record.start_at)
+    : parseAttendanceDateTime(record.start_time_text);
+  const student = studentLookupByCode[record.student_code] || null;
+  const studentName = student
+    ? `${student.first_name} ${student.last_name}`
+    : "Unknown Student";
+
+  return {
+    key: record.id,
+    id: record.id,
+    studentCode: record.student_code || "",
+    studentName,
+    yearLevel: String(student?.year_level || ""),
+    homegroup: student?.homegroup || "",
+    startText: record.start_time_text || "",
+    arrivalText: record.arrival_time_text || "",
+    period: record.period || "",
+    activityName: record.activity_name || "",
+    teacher: record.teacher || "",
+    minutesLate: Number(record.minutes_late || 0),
+    weekKey:
+      record.week_key || (startDate ? getFridayWeekKey(startDate) : "unknown-week"),
+    weekLabel:
+      record.week_label ||
+      (startDate ? getFridayWeekLabel(startDate) : "Unknown week"),
   };
 }
 
@@ -1187,8 +1900,42 @@ function cleanOriginalPublisher(value) {
   );
 }
 
-function isMinorChronicle(value) {
-  return String(value || "").toLowerCase().includes("minor");
+function normalizeStudentCode(value) {
+  return String(value || "").replace(/\s+/g, "").trim().toUpperCase();
+}
+
+function parseAttendanceDateTime(value) {
+  return parseChronicleDate(value);
+}
+
+function parseAttendanceArrivalTime(value, baseDate) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed || trimmed === "-") return null;
+
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})(AM|PM)$/i);
+  if (!match || !baseDate) return null;
+
+  let [, hour, minute, meridiem] = match;
+  let h = Number(hour);
+  if (meridiem.toUpperCase() === "PM" && h !== 12) h += 12;
+  if (meridiem.toUpperCase() === "AM" && h === 12) h = 0;
+
+  return new Date(
+    baseDate.getFullYear(),
+    baseDate.getMonth(),
+    baseDate.getDate(),
+    h,
+    Number(minute)
+  );
+}
+
+function isTodoOverdue(dueDate, isDone) {
+  if (!dueDate || isDone) return false;
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
+    today.getDate()
+  ).padStart(2, "0")}`;
+  return dueDate < todayKey;
 }
 
 function formatDateTimeForSql(date) {

@@ -36,6 +36,7 @@ export default function SessionRollCard({
   });
   const [editingEntryId, setEditingEntryId] = useState(null);
   const [entryForm, setEntryForm] = useState({
+    session_id: "",
     reason: "",
     issued_by: "",
     attendance: "Unmarked",
@@ -57,6 +58,7 @@ export default function SessionRollCard({
   function startEditingEntry(entry) {
     setEditingEntryId(entry.id);
     setEntryForm({
+      session_id: entry.session_id || "",
       reason: entry.reason || "",
       issued_by: entry.issued_by || "",
       attendance: entry.attendance || "Unmarked",
@@ -255,6 +257,20 @@ export default function SessionRollCard({
               </div>
             ) : editingEntryId === entry.id ? (
               <div style={{ marginTop: 12 }}>
+                <select
+                  style={inputStyle}
+                  value={entryForm.session_id}
+                  onChange={(e) =>
+                    setEntryForm((prev) => ({ ...prev, session_id: e.target.value }))
+                  }
+                >
+                  <option value="">Select session</option>
+                  {sessions.map((session) => (
+                    <option key={session.id} value={session.id}>
+                      {session.name} - {session.date}
+                    </option>
+                  ))}
+                </select>
                 <input
                   style={inputStyle}
                   value={entryForm.reason}
@@ -294,7 +310,7 @@ export default function SessionRollCard({
                       }
                     }}
                   >
-                    {entrySavingId === entry.id ? "Saving..." : "Save student"}
+                    {entrySavingId === entry.id ? "Saving..." : "Save changes"}
                   </button>
                   <button
                     type="button"
@@ -315,7 +331,7 @@ export default function SessionRollCard({
                     startEditingEntry(entry);
                   }}
                 >
-                  Edit student
+                  Edit or move
                 </button>
                 <button
                   type="button"

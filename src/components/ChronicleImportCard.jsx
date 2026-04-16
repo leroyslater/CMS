@@ -75,7 +75,7 @@ export default function ChronicleImportCard({
       <div style={cardStyle}>
         <h2 style={sectionTitleStyle}>Chronicle Import</h2>
         <p style={sectionCopyStyle}>
-          Import behaviour data, filter repeat incidents, and assign eligible students in bulk.
+          Upload a Chronicle CSV file to save or update behaviour records in the database.
         </p>
         <input
           key={uploadInputKey}
@@ -84,6 +84,13 @@ export default function ChronicleImportCard({
           accept=".csv"
           onChange={onChronicleFileChange}
         />
+      </div>
+
+      <div style={cardStyle}>
+        <h2 style={sectionTitleStyle}>Chronicle Records</h2>
+        <p style={sectionCopyStyle}>
+          Filter imported Chronicle entries, review weekly groupings, and assign eligible students to sessions.
+        </p>
         <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
           <input
             style={inputStyle}
