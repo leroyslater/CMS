@@ -1,6 +1,8 @@
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import AddStudentCard from "./components/AddStudentCard";
+import AccountSettingsCard from "./components/AccountSettingsCard";
 import AttendanceImportCard from "./components/AttendanceImportCard";
+import AdminAccountsCard from "./components/AdminAccountsCard";
 import AppHeader from "./components/AppHeader";
 import AuthScreen from "./components/AuthScreen";
 import ChronicleImportCard from "./components/ChronicleImportCard";
@@ -8,10 +10,10 @@ import ConfigScreen from "./components/ConfigScreen";
 import CreateSessionCard from "./components/CreateSessionCard";
 import DashboardHome from "./components/DashboardHome";
 import DashboardStats from "./components/DashboardStats";
-import RepeatOffendersCard from "./components/RepeatOffendersCard";
 import SessionRollCard from "./components/SessionRollCard";
 import StudentHistoryCard from "./components/StudentHistoryCard";
 import StudentUploadCard from "./components/StudentUploadCard";
+import UpcomingSessionAssignmentsCard from "./components/UpcomingSessionAssignmentsCard";
 import { useAuth } from "./hooks/useAuth";
 import { useDetentionData } from "./hooks/useDetentionData";
 import { fetchTableRows, upsertTableRows } from "./lib/supabaseRest";
@@ -36,6 +38,8 @@ export default function App() {
     authError,
     setAuthError,
     handleLogout,
+    passwordRecoveryMode,
+    setPasswordRecoveryMode,
   } = useAuth();
   const {
     students,
@@ -66,6 +70,13 @@ export default function App() {
   const [chronicleYearFilter, setChronicleYearFilter] = useState("");
   const [chronicleHomegroupFilter, setChronicleHomegroupFilter] = useState("");
   const [chronicleOnly3Plus, setChronicleOnly3Plus] = useState(false);
+  const [chronicleSyncing, setChronicleSyncing] = useState(false);
+  const [chronicleSyncYear, setChronicleSyncYear] = useState(
+    String(new Date().getFullYear())
+  );
+  const [chronicleSyncModifiedSince, setChronicleSyncModifiedSince] = useState(
+    `${new Date().getFullYear()}-01-01`
+  );
   const [selectedAttendanceKeys, setSelectedAttendanceKeys] = useState([]);
   const [selectedAttendanceKey, setSelectedAttendanceKey] = useState("");
   const [attendanceSearch, setAttendanceSearch] = useState("");
@@ -77,8 +88,6 @@ export default function App() {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState("supervisor");
 
   const [newSession, setNewSession] = useState(resetNewSession);
 
@@ -94,17 +103,48 @@ export default function App() {
   const [creatingTodo, setCreatingTodo] = useState(false);
   const [updatingTodoId, setUpdatingTodoId] = useState(null);
   const [deletingTodoId, setDeletingTodoId] = useState(null);
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  const [accounts, setAccounts] = useState([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [savingAccountId, setSavingAccountId] = useState(null);
+  const [deletingAccountId, setDeletingAccountId] = useState(null);
+  const [resettingPasswordId, setResettingPasswordId] = useState(null);
   const [message, setMessage] = useState("");
   const [activePage, setActivePage] = useState("dashboard");
+  const [dashboardYearFilter, setDashboardYearFilter] = useState([]);
   const error = authError || dataError;
   const currentEntry = newEntry.sessionId
     ? newEntry
     : { ...newEntry, sessionId: selectedSessionId };
   const isSupervisor = (profile?.role || "coordinator") === "supervisor";
+  const isAdmin = profile?.role === "admin";
+  const coordinatorYearLevels = useMemo(
+    () => normalizeYearLevels(profile?.year_levels ?? profile?.year_level),
+    [profile]
+  );
+  const availableDashboardYearLevels = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          students
+            .map((student) => String(student.year_level || "").trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => Number(a) - Number(b) || a.localeCompare(b)),
+    [students]
+  );
+  const dashboardYearLevels = useMemo(
+    () => normalizeYearLevels(dashboardYearFilter),
+    [dashboardYearFilter]
+  );
+  const shouldScopeDashboardByYear = dashboardYearLevels.length > 0;
   const pages = useMemo(
     () =>
       isSupervisor
-        ? [{ id: "sessions", label: "Sessions" }]
+        ? [
+            { id: "sessions", label: "Sessions" },
+          ]
         : [
             { id: "dashboard", label: "Dashboard" },
             { id: "sessions", label: "Sessions" },
@@ -116,10 +156,21 @@ export default function App() {
   );
 
   useEffect(() => {
-    if (!pages.some((page) => page.id === activePage)) {
+    if (activePage !== "account" && !pages.some((page) => page.id === activePage)) {
       setActivePage(pages[0].id);
     }
   }, [activePage, pages]);
+
+  useEffect(() => {
+    if (passwordRecoveryMode) {
+      setActivePage("account");
+    }
+  }, [passwordRecoveryMode]);
+
+  useEffect(() => {
+    if (!authSession || passwordRecoveryMode) return;
+    setActivePage(isSupervisor ? "sessions" : "dashboard");
+  }, [authSession, isSupervisor, passwordRecoveryMode]);
 
   function clearError() {
     setAuthError("");
@@ -132,36 +183,6 @@ export default function App() {
     setMessage("");
 
     try {
-      if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-              role,
-            },
-          },
-        });
-
-        if (error) {
-          setAuthError(error.message);
-          return;
-        }
-
-        if (data.user) {
-          await supabase.from("profiles").upsert({
-            id: data.user.id,
-            email,
-            full_name: fullName,
-            role,
-          });
-        }
-
-        setMessage("Account created.");
-        return;
-      }
-
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -177,6 +198,235 @@ export default function App() {
       setAuthError(err.message || "Authentication failed.");
     }
   }
+
+  async function handleForgotPassword(event) {
+    event.preventDefault();
+    clearError();
+    setMessage("");
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        return;
+      }
+
+      setMessage("Password reset email sent.");
+    } catch (err) {
+      setAuthError(err.message || "Failed to send reset email.");
+    }
+  }
+
+  async function handleUpdatePassword(nextPassword, confirmPassword) {
+    if (nextPassword !== confirmPassword) {
+      setAuthError("Passwords do not match.");
+      return false;
+    }
+
+    clearError();
+    setMessage("");
+    setUpdatingPassword(true);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: nextPassword,
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        return false;
+      }
+
+      setPasswordRecoveryMode(false);
+      setMessage("Password updated.");
+      return true;
+    } finally {
+      setUpdatingPassword(false);
+    }
+  }
+
+  async function handleCreateAccount(payload) {
+    clearError();
+    setMessage("");
+    setCreatingAccount(true);
+
+    try {
+      const response = await fetch("/api/admin-users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+        },
+        body: JSON.stringify({
+          action: "create",
+          ...payload,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setDataError(result?.error || "Failed to create account.");
+        return false;
+      }
+
+      setMessage("Account created.");
+      await loadAccounts();
+      return true;
+    } catch (err) {
+      setDataError(err.message || "Failed to create account.");
+      return false;
+    } finally {
+      setCreatingAccount(false);
+    }
+  }
+
+  async function loadAccounts() {
+    if (!isAdmin || !authSession?.access_token) {
+      setAccounts([]);
+      return [];
+    }
+
+    setLoadingAccounts(true);
+
+    try {
+      const response = await fetch("/api/admin-users", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${authSession.access_token}`,
+        },
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to load users.");
+      }
+
+      const users = result?.users || [];
+      setAccounts(users);
+      return users;
+    } catch (err) {
+      setDataError(err.message || "Failed to load users.");
+      return [];
+    } finally {
+      setLoadingAccounts(false);
+    }
+  }
+
+  const loadAccountsEvent = useEffectEvent(loadAccounts);
+
+  async function handleUpdateAccount(account) {
+    clearError();
+    setMessage("");
+    setSavingAccountId(account.id);
+
+    try {
+      const response = await fetch("/api/admin-users", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+        },
+        body: JSON.stringify(account),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setDataError(result?.error || "Failed to update account.");
+        return false;
+      }
+
+      setAccounts((prev) =>
+        prev.map((item) =>
+          item.id === account.id
+            ? {
+                ...item,
+                email: account.email,
+                full_name: account.fullName,
+                role: account.role,
+              }
+            : item
+        )
+      );
+      setMessage("Account updated.");
+      return true;
+    } finally {
+      setSavingAccountId(null);
+    }
+  }
+
+  async function handleDeleteAccount(accountId, emailAddress) {
+    const confirmed = window.confirm(`Delete account ${emailAddress}?`);
+    if (!confirmed) return;
+
+    clearError();
+    setMessage("");
+    setDeletingAccountId(accountId);
+
+    try {
+      const response = await fetch("/api/admin-users", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+        },
+        body: JSON.stringify({ id: accountId }),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setDataError(result?.error || "Failed to delete account.");
+        return;
+      }
+
+      setAccounts((prev) => prev.filter((account) => account.id !== accountId));
+      setMessage("Account deleted.");
+    } finally {
+      setDeletingAccountId(null);
+    }
+  }
+
+  async function handleResetAccountPassword(accountId, emailAddress) {
+    clearError();
+    setMessage("");
+    setResettingPasswordId(accountId);
+
+    try {
+      const response = await fetch("/api/admin-users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+        },
+        body: JSON.stringify({
+          action: "reset_password",
+          email: emailAddress,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setDataError(result?.error || "Failed to send reset email.");
+        return;
+      }
+
+      setMessage(`Password reset email sent to ${emailAddress}.`);
+    } finally {
+      setResettingPasswordId(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setAccounts([]);
+      return;
+    }
+
+    loadAccountsEvent();
+  }, [isAdmin, authSession?.access_token]);
 
   async function handleCreateSession(e) {
     e.preventDefault();
@@ -680,6 +930,77 @@ export default function App() {
     }
   }
 
+  async function handleChronicleSync() {
+    clearError();
+    setMessage("");
+
+    const accessToken = authSession?.access_token;
+    if (!accessToken) {
+      setDataError("You need to be signed in before syncing Chronicle data.");
+      return;
+    }
+
+    setChronicleSyncing(true);
+
+    try {
+      const response = await fetch("/api/compass-chronicle-sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          year: Number.parseInt(chronicleSyncYear, 10) || new Date().getFullYear(),
+          modifiedSinceTimestamp: chronicleSyncModifiedSince
+            ? `${chronicleSyncModifiedSince}T00:00:00.000Z`
+            : undefined,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setDataError(result?.error || "Failed to sync Chronicle records from Compass.");
+        return;
+      }
+
+      const parsedRows = await loadChronicleRows(accessToken);
+      const sourceCount = result?.totalSourceEntries || 0;
+      const syncedCount = result?.syncedCount || 0;
+      const duplicateMessage =
+        result?.duplicateCount > 0
+          ? ` Collapsed ${result.duplicateCount} duplicate Chronicle row${result.duplicateCount === 1 ? "" : "s"} from Compass.`
+          : "";
+      const skippedMessage =
+        result?.missingStudentCodes?.length > 0
+          ? ` Skipped ${result.missingStudentCodes.length} missing student code${result.missingStudentCodes.length === 1 ? "" : "s"}: ${result.missingStudentCodes.join(", ")}.`
+          : "";
+
+      setSelectedChronicleKeys([]);
+      setSelectedChronicleKey("");
+      if (sourceCount === 0) {
+        setMessage(
+          "Chronicle sync complete: Compass returned 0 source entries for the selected year."
+        );
+        return;
+      }
+
+      if (syncedCount === 0) {
+        setMessage(
+          `Chronicle sync complete: Compass returned ${sourceCount} source entr${sourceCount === 1 ? "y" : "ies"}, but 0 were saved.${skippedMessage || " Check that student codes in Compass match Students."}`
+        );
+        return;
+      }
+
+      setMessage(
+        `Chronicle sync complete: ${sourceCount} source entr${sourceCount === 1 ? "y" : "ies"}, ${result?.insertedCount || 0} new, ${result?.updatedCount || 0} updated, ${parsedRows.length} total loaded.${duplicateMessage}${skippedMessage}`
+      );
+    } catch (err) {
+      setDataError(err.message || "Failed to sync Chronicle records from Compass.");
+    } finally {
+      setChronicleSyncing(false);
+    }
+  }
+
   async function handleAttendanceUpload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -775,6 +1096,10 @@ export default function App() {
         (record) => !existingIds.has(record.id)
       ).length;
       const updatedCount = validAttendancePayload.length - insertedCount;
+      const schoolLateCount = validAttendancePayload.filter(
+        (record) => record.arrival_at || (record.arrival_time_text && record.arrival_time_text !== "-")
+      ).length;
+      const classLateCount = validAttendancePayload.length - schoolLateCount;
       const skippedCount = missingStudentCodes.length;
       const duplicateMessage =
         duplicateCount > 0
@@ -787,7 +1112,7 @@ export default function App() {
       setSelectedAttendanceKeys([]);
       setSelectedAttendanceKey("");
       setMessage(
-        `Attendance import complete: ${insertedCount} new, ${updatedCount} updated, ${parsedRows.length} total loaded.${duplicateMessage}${skippedMessage}`
+        `Attendance import complete: ${insertedCount} new, ${updatedCount} updated, ${parsedRows.length} total loaded. ${schoolLateCount} school late, ${classLateCount} class late.${duplicateMessage}${skippedMessage}`
       );
     } catch (err) {
       setDataError(err.message || "Failed to parse attendance file.");
@@ -975,6 +1300,74 @@ export default function App() {
     [students]
   );
 
+  useEffect(() => {
+    if (isSupervisor) {
+      setDashboardYearFilter([]);
+      return;
+    }
+
+    setDashboardYearFilter((current) => {
+      const normalizedCurrent = normalizeYearLevels(current).filter((level) =>
+        availableDashboardYearLevels.includes(level)
+      );
+
+      if (normalizedCurrent.length > 0) {
+        return normalizedCurrent;
+      }
+
+      const initialLevels = isAdmin
+        ? []
+        : coordinatorYearLevels.filter((level) =>
+            availableDashboardYearLevels.includes(level)
+          );
+
+      return initialLevels;
+    });
+  }, [availableDashboardYearLevels, coordinatorYearLevels, isAdmin, isSupervisor]);
+
+  const dashboardStudents = useMemo(() => {
+    if (!shouldScopeDashboardByYear) return students;
+
+    return students.filter((student) =>
+      dashboardYearLevels.includes(String(student.year_level || "").trim())
+    );
+  }, [dashboardYearLevels, shouldScopeDashboardByYear, students]);
+
+  const dashboardStudentCodes = useMemo(
+    () => new Set(dashboardStudents.map((student) => student.student_code)),
+    [dashboardStudents]
+  );
+
+  const dashboardStudentNames = useMemo(
+    () =>
+      new Set(
+        dashboardStudents.map((student) =>
+          `${student.first_name} ${student.last_name}`.trim()
+        )
+      ),
+    [dashboardStudents]
+  );
+
+  const dashboardChronicleRows = useMemo(() => {
+    if (!shouldScopeDashboardByYear) return chronicleRows;
+    return chronicleRows.filter((row) => dashboardStudentCodes.has(row.studentCode));
+  }, [chronicleRows, dashboardStudentCodes, shouldScopeDashboardByYear]);
+
+  const dashboardAttendanceRows = useMemo(() => {
+    if (!shouldScopeDashboardByYear) return attendanceRows;
+    return attendanceRows.filter((row) => dashboardStudentCodes.has(row.studentCode));
+  }, [attendanceRows, dashboardStudentCodes, shouldScopeDashboardByYear]);
+
+  const dashboardChronicleGrouped = useMemo(() => {
+    if (!shouldScopeDashboardByYear) return chronicleGrouped;
+    return chronicleGrouped.filter((group) => dashboardStudentCodes.has(group.studentCode));
+  }, [chronicleGrouped, dashboardStudentCodes, shouldScopeDashboardByYear]);
+
+  const dashboardAttendanceGrouped = useMemo(() => {
+    if (!shouldScopeDashboardByYear) return attendanceGrouped;
+    return attendanceGrouped.filter((group) => dashboardStudentCodes.has(group.studentCode));
+  }, [attendanceGrouped, dashboardStudentCodes, shouldScopeDashboardByYear]);
+
   async function loadChronicleRows(accessToken = authSession?.access_token) {
     if (!accessToken) {
       setChronicleRows([]);
@@ -987,9 +1380,9 @@ export default function App() {
         ascending: false,
       });
 
-      const parsedRows = (chronicleData || []).map((record) =>
-        mapChronicleRecordToView(record, studentLookupByCode)
-      );
+      const parsedRows = (chronicleData || [])
+        .map((record) => mapChronicleRecordToView(record, studentLookupByCode))
+        .filter((record) => isTrackedChronicleType(record.chronicleType));
 
       setChronicleRows(parsedRows);
       return parsedRows;
@@ -1284,29 +1677,36 @@ export default function App() {
       );
   }
 
-  function getStudentFlag(name) {
-    const studentEntries = entries.filter((e) => e.student_name === name);
-    const total = studentEntries.length;
-    if (total >= 3) return "⚠️ 3+ detentions";
-    if (total >= 2) return "⚠️ Repeat";
-    return null;
-  }
+  const upcomingSession = useMemo(() => {
+    const futureSessions = sessions
+      .filter((session) => session.date && session.date >= todayString)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
 
-  const repeatStudents = useMemo(() => {
-    const counts = {};
-    entries.forEach((entry) => {
-      counts[entry.student_name] = (counts[entry.student_name] || 0) + 1;
-    });
-    return Object.entries(counts)
-      .filter(([, count]) => count >= 2)
-      .sort((a, b) => b[1] - a[1]);
-  }, [entries]);
+    return futureSessions[0] || null;
+  }, [sessions]);
+
+  const upcomingSessionAssignments = useMemo(() => {
+    if (!upcomingSession) return [];
+
+    return entries
+      .filter((entry) => entry.session_id === upcomingSession.id)
+      .filter((entry) => !shouldScopeDashboardByYear || dashboardStudentNames.has(entry.student_name))
+      .map((entry) => ({
+        name: entry.student_name,
+        reason: entry.reason,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [dashboardStudentNames, entries, upcomingSession, shouldScopeDashboardByYear]);
+
+  const dashboardStudentCount = shouldScopeDashboardByYear
+    ? dashboardStudents.length
+    : students.length;
 
   const dashboardStats = useMemo(
     () => [
       {
         label: "Students",
-        value: students.length,
+        value: dashboardStudentCount,
         note: "Roster available to assign",
       },
       {
@@ -1320,28 +1720,31 @@ export default function App() {
         note: "Assigned detention records",
       },
       {
-        label: "Repeat Flags",
-        value: repeatStudents.length,
-        note: "Students with multiple records",
+        label: "Upcoming Assigned",
+        value: upcomingSessionAssignments.length,
+        note: upcomingSession
+          ? `Students in ${upcomingSession.name}`
+          : "No future session scheduled",
       },
       {
         label: "Late Arrivals",
-        value: attendanceRows.length,
+        value: dashboardAttendanceRows.length,
         note: "Attendance incidents imported",
       },
     ],
     [
-      students.length,
+      dashboardStudentCount,
       sessions.length,
       entries.length,
-      repeatStudents.length,
-      attendanceRows.length,
+      upcomingSessionAssignments.length,
+      upcomingSession,
+      dashboardAttendanceRows.length,
     ]
   );
 
   const topChronicleStudents = useMemo(() => {
     const counts = {};
-    chronicleRows.forEach((row) => {
+    dashboardChronicleRows.forEach((row) => {
       if (!row.studentName) return;
       counts[row.studentName] = (counts[row.studentName] || 0) + 1;
     });
@@ -1350,12 +1753,35 @@ export default function App() {
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
       .slice(0, 5);
-  }, [chronicleRows]);
+  }, [dashboardChronicleRows]);
+
+  const chronicleTwoPlusThisWeek = useMemo(
+    () => {
+      const currentWeekKey = getFridayWeekKey(new Date());
+
+      return dashboardChronicleGrouped
+        .filter((group) => group.weekKey === currentWeekKey)
+        .filter((group) => group.count >= 2)
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+        .slice(0, 8)
+        .map((group) => ({
+          key: group.key,
+          name: group.studentName,
+          count: group.count,
+          weekLabel: group.weekLabel,
+          homegroup: group.homegroup,
+        }));
+    },
+    [dashboardChronicleGrouped]
+  );
 
   const topDetentionStudents = useMemo(
     () =>
       Object.entries(
         entries.reduce((counts, entry) => {
+          if (shouldScopeDashboardByYear && !dashboardStudentNames.has(entry.student_name)) {
+            return counts;
+          }
           if (entry.student_name) {
             counts[entry.student_name] = (counts[entry.student_name] || 0) + 1;
           }
@@ -1365,12 +1791,12 @@ export default function App() {
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
         .slice(0, 5),
-    [entries]
+    [dashboardStudentNames, entries, shouldScopeDashboardByYear]
   );
 
   const topAttendanceStudents = useMemo(() => {
     const counts = {};
-    attendanceRows.forEach((row) => {
+    dashboardAttendanceRows.forEach((row) => {
       if (!row.studentName) return;
       counts[row.studentName] = (counts[row.studentName] || 0) + 1;
     });
@@ -1379,7 +1805,24 @@ export default function App() {
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
       .slice(0, 5);
-  }, [attendanceRows]);
+  }, [dashboardAttendanceRows]);
+
+  const attendanceTwoPlusThisWeek = useMemo(() => {
+    const currentWeekKey = getFridayWeekKey(new Date());
+
+    return dashboardAttendanceGrouped
+      .filter((group) => group.weekKey === currentWeekKey)
+      .filter((group) => group.count >= 2)
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+      .slice(0, 8)
+      .map((group) => ({
+        key: group.key,
+        name: group.studentName,
+        count: group.count,
+        weekLabel: group.weekLabel,
+        homegroup: group.homegroup,
+      }));
+  }, [dashboardAttendanceGrouped]);
 
   if (!supabase) {
     return <ConfigScreen />;
@@ -1389,39 +1832,33 @@ export default function App() {
 
   if (!authSession) {
     return (
-      <AuthScreen
-        mode={mode}
-        setMode={setMode}
-        fullName={fullName}
-        setFullName={setFullName}
-        role={role}
-        setRole={setRole}
-        email={email}
-        setEmail={setEmail}
-        password={password}
-        setPassword={setPassword}
-        handleSubmit={handleSubmit}
-        error={error}
-        message={message}
-      />
+        <AuthScreen
+          mode={mode}
+          setMode={setMode}
+          email={email}
+          setEmail={setEmail}
+          password={password}
+          setPassword={setPassword}
+          handleSubmit={handleSubmit}
+          handleForgotPassword={handleForgotPassword}
+          error={error}
+          message={message}
+        />
     );
   }
 
   return (
     <div style={pageStyle}>
       <AppHeader
-        profile={profile}
-        authSession={authSession}
         handleLogout={handleLogout}
-        sessionsCount={sessions.length}
-        studentsCount={students.length}
-        isSupervisor={isSupervisor}
+        onOpenAccount={() => setActivePage("account")}
+        accountActive={activePage === "account"}
       />
 
       {error ? <p style={statusErrorStyle}>{error}</p> : null}
       {message ? <p style={statusSuccessStyle}>{message}</p> : null}
 
-      {isSupervisor ? (
+      {isSupervisor && activePage !== "account" ? (
         <SessionRollCard
           selectedSessionId={selectedSessionId}
           setSelectedSessionId={setSelectedSessionId}
@@ -1435,28 +1872,47 @@ export default function App() {
         />
       ) : (
         <>
-          <div style={navBarStyle}>
-            {pages.map((page) => (
-              <button
-                key={page.id}
-                type="button"
-                style={{
-                  ...navButtonStyle,
-                  ...(activePage === page.id ? navButtonActiveStyle : {}),
-                }}
-                onClick={() => setActivePage(page.id)}
-              >
-                {page.label}
-              </button>
-            ))}
-          </div>
+          {!isSupervisor ? (
+            <div style={navBarStyle}>
+              {pages.map((page) => (
+                <button
+                  key={page.id}
+                  type="button"
+                  style={{
+                    ...navButtonStyle,
+                    ...(activePage === page.id ? navButtonActiveStyle : {}),
+                  }}
+                  onClick={() => setActivePage(page.id)}
+                >
+                  {page.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           {activePage === "dashboard" ? (
             <DashboardHome
               stats={dashboardStats}
+              showYearFilters={!isSupervisor}
+              availableYearLevels={availableDashboardYearLevels}
+              selectedYearLevels={dashboardYearLevels}
+              onToggleYearLevel={(yearLevel) =>
+                setDashboardYearFilter((current) =>
+                  current.includes(yearLevel)
+                    ? current.filter((level) => level !== yearLevel)
+                    : [...current, yearLevel].sort(
+                        (a, b) => Number(a) - Number(b) || a.localeCompare(b)
+                      )
+                )
+              }
+              onClearYearLevels={() => setDashboardYearFilter([])}
               topChronicleStudents={topChronicleStudents}
+              chronicleTwoPlusThisWeek={chronicleTwoPlusThisWeek}
               topAttendanceStudents={topAttendanceStudents}
+              attendanceTwoPlusThisWeek={attendanceTwoPlusThisWeek}
               topDetentionStudents={topDetentionStudents}
+              upcomingSession={upcomingSession}
+              upcomingSessionAssignments={upcomingSessionAssignments}
               todos={todos.map((todo) => ({
                 id: todo.id,
                 text: todo.task_text,
@@ -1472,6 +1928,31 @@ export default function App() {
               onDeleteTodo={handleDeleteTodo}
               setSelectedStudent={setSelectedStudent}
             />
+          ) : null}
+
+          {activePage === "account" ? (
+            <>
+              <AccountSettingsCard
+                recoveryMode={passwordRecoveryMode}
+                updatingPassword={updatingPassword}
+                onUpdatePassword={handleUpdatePassword}
+              />
+
+              {isAdmin ? (
+                <AdminAccountsCard
+                  accounts={accounts}
+                  loadingAccounts={loadingAccounts}
+                  creatingAccount={creatingAccount}
+                  savingAccountId={savingAccountId}
+                  deletingAccountId={deletingAccountId}
+                  resettingPasswordId={resettingPasswordId}
+                  onCreateAccount={handleCreateAccount}
+                  onUpdateAccount={handleUpdateAccount}
+                  onDeleteAccount={handleDeleteAccount}
+                  onResetPassword={handleResetAccountPassword}
+                />
+              ) : null}
+            </>
           ) : null}
 
           {activePage === "sessions" ? (
@@ -1512,12 +1993,6 @@ export default function App() {
                 entrySavingId={entrySavingId}
               />
 
-              <RepeatOffendersCard
-                repeatStudents={repeatStudents}
-                getStudentFlag={getStudentFlag}
-                setSelectedStudent={setSelectedStudent}
-              />
-
               <StudentHistoryCard
                 selectedStudent={selectedStudent}
                 getStudentHistory={getStudentHistory}
@@ -1527,7 +2002,13 @@ export default function App() {
 
           {activePage === "chronicle" ? (
             <ChronicleImportCard
+              handleChronicleSync={handleChronicleSync}
               handleChronicleUpload={handleChronicleUpload}
+              chronicleSyncYear={chronicleSyncYear}
+              setChronicleSyncYear={setChronicleSyncYear}
+              chronicleSyncModifiedSince={chronicleSyncModifiedSince}
+              setChronicleSyncModifiedSince={setChronicleSyncModifiedSince}
+              chronicleSyncing={chronicleSyncing}
               chronicleSearch={chronicleSearch}
               setChronicleSearch={setChronicleSearch}
               chronicleYearFilter={chronicleYearFilter}
@@ -1676,9 +2157,15 @@ function extractYearLevelFromHomegroup(value) {
 function parseChronicleDate(value) {
   if (!value) return null;
 
-  const match = String(value)
-    .trim()
-    .match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  const text = String(value).trim();
+  const nativeDate = new Date(text);
+  if (!Number.isNaN(nativeDate.getTime())) {
+    return nativeDate;
+  }
+
+  const match = text.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i
+  );
 
   if (!match) return null;
 
@@ -1696,6 +2183,27 @@ function formatDate(date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function normalizeYearLevels(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item).trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (value == null) {
+    return [];
+  }
+
+  return [String(value).trim()].filter(Boolean);
 }
 
 function getFridayWeekKey(date) {
@@ -1770,12 +2278,20 @@ function createAttendanceRecord(row) {
   const arrivalTimeText = getChronicleValue(row, "ArrivalTime", "Arrival Time");
   const startDate = parseAttendanceDateTime(startTimeText);
   const arrivalDate = parseAttendanceArrivalTime(arrivalTimeText, startDate);
+  const isClassLate = String(arrivalTimeText || "").trim() === "-";
 
-  if (!studentCode || !startDate || !arrivalDate || arrivalDate <= startDate) {
+  if (
+    !studentCode ||
+    !startDate ||
+    (!isClassLate && (!arrivalDate || arrivalDate <= startDate))
+  ) {
     return null;
   }
 
-  const minutesLate = Math.round((arrivalDate - startDate) / 60000);
+  const minutesLate =
+    arrivalDate && arrivalDate > startDate
+      ? Math.round((arrivalDate - startDate) / 60000)
+      : 0;
   const period = getChronicleValue(row, "Period");
   const activityCode = getChronicleValue(row, "ActivityCode", "Activity Code");
 
@@ -1785,7 +2301,7 @@ function createAttendanceRecord(row) {
     start_time_text: startTimeText || "",
     start_at: formatDateTimeForSql(startDate),
     arrival_time_text: arrivalTimeText || "",
-    arrival_at: formatDateTimeForSql(arrivalDate),
+    arrival_at: arrivalDate ? formatDateTimeForSql(arrivalDate) : null,
     period: period || "",
     activity_code: activityCode || "",
     activity_name: getChronicleValue(row, "ActivityName", "Activity Name") || "",
@@ -1812,7 +2328,9 @@ function mapChronicleRecordToView(record, studentLookupByCode = {}) {
     studentName,
     yearLevel: String(student?.year_level || ""),
     homegroup: student?.homegroup || "",
-    occurredText: record.occurred_timestamp || "",
+    occurredText: occurredDate
+      ? formatDisplayDate(occurredDate)
+      : record.occurred_timestamp || "",
     occurredDate,
     weekKey:
       record.week_key ||
@@ -1821,7 +2339,7 @@ function mapChronicleRecordToView(record, studentLookupByCode = {}) {
       record.week_label ||
       (occurredDate ? getFridayWeekLabel(occurredDate) : "Unknown week"),
     chronicleType: record.chronicle_type || "",
-    details: record.details || "",
+    details: normalizeChronicleDetails(record.details),
     originalPublisher: record.original_publisher || "",
   };
 }
@@ -1834,6 +2352,10 @@ function mapAttendanceRecordToView(record, studentLookupByCode = {}) {
   const studentName = student
     ? `${student.first_name} ${student.last_name}`
     : "Unknown Student";
+  const attendanceType =
+    record.arrival_at || (record.arrival_time_text && record.arrival_time_text !== "-")
+      ? "School late"
+      : "Class late";
 
   return {
     key: record.id,
@@ -1842,12 +2364,19 @@ function mapAttendanceRecordToView(record, studentLookupByCode = {}) {
     studentName,
     yearLevel: String(student?.year_level || ""),
     homegroup: student?.homegroup || "",
-    startText: record.start_time_text || "",
-    arrivalText: record.arrival_time_text || "",
+    startText: startDate ? formatDisplayDateTime(startDate) : record.start_time_text || "",
+    arrivalText:
+      record.arrival_at && parseChronicleDate(record.arrival_at)
+        ? formatDisplayTime(parseChronicleDate(record.arrival_at))
+        : record.arrival_time_text || "",
     period: record.period || "",
     activityName: record.activity_name || "",
+    attendanceType,
+    attendanceDescription:
+      attendanceType === "School late" ? "Late to school" : "Late to class",
     teacher: record.teacher || "",
     minutesLate: Number(record.minutes_late || 0),
+    startAtDate: startDate,
     weekKey:
       record.week_key || (startDate ? getFridayWeekKey(startDate) : "unknown-week"),
     weekLabel:
@@ -1886,10 +2415,34 @@ function extractSection(value, marker) {
   return remainder.slice(0, endIndex).trim();
 }
 
+function normalizeChronicleDetails(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+
+  const overviewMatch = text.match(/(?:^|[|~\n\r])\s*Overview:\s*(.*?)(?=\s*(?:\||~|[A-Za-z ]+:|$))/i);
+  if (overviewMatch?.[1]) {
+    return overviewMatch[1].trim();
+  }
+
+  const pipeIndex = text.indexOf("|");
+  if (pipeIndex !== -1) {
+    return text.slice(0, pipeIndex).trim();
+  }
+
+  return text;
+}
+
 function cleanChronicleType(value) {
   return String(value || "")
     .replace(/\*/g, "")
     .trim();
+}
+
+function isTrackedChronicleType(value) {
+  const normalized = cleanChronicleType(value).toLowerCase();
+  return (
+    normalized === "minor behaviour" || normalized === "major behaviour"
+  );
 }
 
 function cleanOriginalPublisher(value) {
@@ -1946,4 +2499,31 @@ function formatDateTimeForSql(date) {
   const minutes = String(date.getMinutes()).padStart(2, "0");
   const seconds = String(date.getSeconds()).padStart(2, "0");
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function formatDisplayDateTime(date) {
+  return date.toLocaleString("en-AU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function formatDisplayDate(date) {
+  return date.toLocaleDateString("en-AU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function formatDisplayTime(date) {
+  return date.toLocaleString("en-AU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 }

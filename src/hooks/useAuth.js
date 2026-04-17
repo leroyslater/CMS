@@ -7,6 +7,7 @@ export function useAuth() {
   const [profile, setProfile] = useState(null);
   const [booting, setBooting] = useState(Boolean(supabase));
   const [error, setError] = useState("");
+  const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
 
   async function loadProfile(user) {
     try {
@@ -18,6 +19,7 @@ export function useAuth() {
           email: user.email || "",
           full_name: user.user_metadata?.full_name || "",
           role: user.user_metadata?.role || "coordinator",
+          year_levels: user.user_metadata?.year_levels || [],
         }
       );
     } catch (err) {
@@ -45,6 +47,8 @@ export function useAuth() {
         if (!isMounted) return;
         setAuthSession(session);
         setBooting(false);
+        const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        setPasswordRecoveryMode(params.get("type") === "recovery");
 
         if (session?.user) {
           await loadProfileEvent({
@@ -65,6 +69,12 @@ export function useAuth() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!isMounted) return;
+
+      if (_event === "PASSWORD_RECOVERY") {
+        setPasswordRecoveryMode(true);
+      } else if (_event === "SIGNED_OUT") {
+        setPasswordRecoveryMode(false);
+      }
 
       setAuthSession(session);
       setBooting(false);
@@ -104,5 +114,7 @@ export function useAuth() {
     authError: error,
     setAuthError: setError,
     handleLogout,
+    passwordRecoveryMode,
+    setPasswordRecoveryMode,
   };
 }

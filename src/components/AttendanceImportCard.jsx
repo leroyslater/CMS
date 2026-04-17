@@ -1,12 +1,17 @@
 import { useMemo, useState } from "react";
 
 import {
+  brandPalette,
   buttonStyle,
   cardStyle,
   entryCardStyle,
   inputStyle,
   sectionCopyStyle,
   sectionTitleStyle,
+  statCardStyle,
+  statGridStyle,
+  statLabelStyle,
+  statValueStyle,
 } from "../styles/uiStyles";
 
 export default function AttendanceImportCard({
@@ -57,6 +62,34 @@ export default function AttendanceImportCard({
   );
   const [expandedWeeks, setExpandedWeeks] = useState({});
   const [uploadInputKey, setUploadInputKey] = useState(0);
+  const summary = useMemo(() => {
+    const groupCount = filteredAttendance.length;
+    const incidentCount = filteredAttendance.reduce(
+      (total, group) => total + group.rows.length,
+      0
+    );
+    const thresholdCount = filteredAttendance.filter((group) => group.count >= 3).length;
+    const schoolLateCount = filteredAttendance.reduce(
+      (total, group) =>
+        total +
+        group.rows.filter((row) => row.attendanceType === "School late").length,
+      0
+    );
+    const classLateCount = filteredAttendance.reduce(
+      (total, group) =>
+        total +
+        group.rows.filter((row) => row.attendanceType === "Class late").length,
+      0
+    );
+
+    return {
+      groupCount,
+      incidentCount,
+      thresholdCount,
+      schoolLateCount,
+      classLateCount,
+    };
+  }, [filteredAttendance]);
 
   function toggleWeek(weekKey) {
     setExpandedWeeks((prev) => ({
@@ -73,9 +106,10 @@ export default function AttendanceImportCard({
   return (
     <>
       <div style={cardStyle}>
-        <h2 style={sectionTitleStyle}>Attendance Import</h2>
+        <h2 style={sectionTitleStyle}>Attendance CSV Import</h2>
         <p style={sectionCopyStyle}>
-          Upload the late attendance CSV to save late arrivals and calculate weekly thresholds.
+          Upload the attendance CSV report to load both school-late and class-late records. A real
+          arrival time counts as school late. `-` in arrival time counts as class late.
         </p>
         <input
           key={uploadInputKey}
@@ -89,8 +123,30 @@ export default function AttendanceImportCard({
       <div style={cardStyle}>
         <h2 style={sectionTitleStyle}>Attendance Records</h2>
         <p style={sectionCopyStyle}>
-          Review weekly late counts and assign students with 3 or more late arrivals to detention.
+          Review weekly late counts from the imported attendance CSV, then assign students with 3 or more late arrivals to detention.
         </p>
+        <div style={statGridStyle}>
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>Student Weeks</div>
+            <div style={statValueStyle}>{summary.groupCount}</div>
+          </div>
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>Late Incidents</div>
+            <div style={statValueStyle}>{summary.incidentCount}</div>
+          </div>
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>3+ Threshold</div>
+            <div style={statValueStyle}>{summary.thresholdCount}</div>
+          </div>
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>School Late</div>
+            <div style={statValueStyle}>{summary.schoolLateCount}</div>
+          </div>
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>Class Late</div>
+            <div style={statValueStyle}>{summary.classLateCount}</div>
+          </div>
+        </div>
         <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
           <input
             style={inputStyle}
@@ -162,7 +218,7 @@ export default function AttendanceImportCard({
                     fontWeight: 700,
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
-                    color: "#bf721f",
+                    color: brandPalette.mintStrong,
                     marginBottom: 10,
                     cursor: "pointer",
                   }}
@@ -182,8 +238,8 @@ export default function AttendanceImportCard({
                           style={{
                             border:
                               group.count >= 3
-                                ? "2px solid #bf721f"
-                                : "1px solid #d0d1d7",
+                                ? `2px solid ${brandPalette.mintStrong}`
+                                : `1px solid ${brandPalette.border}`,
                             padding: 10,
                             marginBottom: 10,
                             cursor: "pointer",
@@ -258,17 +314,57 @@ export default function AttendanceImportCard({
                                   key={`${group.key}-${index}`}
                                   style={{ ...entryCardStyle, marginTop: 8 }}
                                 >
-                                  <div style={{ fontWeight: "bold" }}>
-                                    {row.startText} · {row.period || "No period"}
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      gap: 12,
+                                      alignItems: "center",
+                                      marginBottom: 8,
+                                    }}
+                                  >
+                                    <div style={{ fontWeight: "bold" }}>
+                                      {row.startText} · {row.period || "No period"}
+                                    </div>
+                                    <span
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        padding: "6px 10px",
+                                        borderRadius: 999,
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        color:
+                                          row.attendanceType === "School late"
+                                            ? brandPalette.navy
+                                            : "#8a341f",
+                                        background:
+                                          row.attendanceType === "School late"
+                                            ? brandPalette.mintSoft
+                                            : "#fff2eb",
+                                        border:
+                                          row.attendanceType === "School late"
+                                            ? "1px solid rgba(92,231,170,0.45)"
+                                            : "1px solid #f1c7b1",
+                                      }}
+                                    >
+                                      {row.attendanceType}
+                                    </span>
                                   </div>
                                   <div>
-                                    <strong>Arrival:</strong> {row.arrivalText || "-"}
+                                    <strong>Class:</strong> {row.activityName || "-"}
+                                  </div>
+                                  <div>
+                                    <strong>Arrival:</strong>{" "}
+                                    {row.attendanceType === "Class late"
+                                      ? "Not recorded"
+                                      : row.arrivalText || "-"}
                                   </div>
                                   <div>
                                     <strong>Minutes late:</strong> {row.minutesLate}
                                   </div>
                                   <div>
-                                    <strong>Activity:</strong> {row.activityName || "-"}
+                                    <strong>Type:</strong> {row.attendanceDescription || "-"}
                                   </div>
                                   <div>
                                     <strong>Teacher:</strong> {row.teacher || "-"}

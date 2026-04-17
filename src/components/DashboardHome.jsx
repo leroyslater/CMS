@@ -1,21 +1,34 @@
 import { useState } from "react";
 
 import {
+  brandPalette,
   buttonStyle,
   cardStyle,
   entryCardStyle,
   inputStyle,
+  navButtonActiveStyle,
+  navButtonStyle,
   sectionCopyStyle,
   sectionTitleStyle,
   twoColStyle,
 } from "../styles/uiStyles";
 import DashboardStats from "./DashboardStats";
+import UpcomingSessionAssignmentsCard from "./UpcomingSessionAssignmentsCard";
 
 export default function DashboardHome({
   stats,
+  showYearFilters,
+  availableYearLevels,
+  selectedYearLevels,
+  onToggleYearLevel,
+  onClearYearLevels,
   topChronicleStudents,
+  chronicleTwoPlusThisWeek,
   topAttendanceStudents,
+  attendanceTwoPlusThisWeek,
   topDetentionStudents,
+  upcomingSession,
+  upcomingSessionAssignments,
   todos,
   creatingTodo,
   updatingTodoId,
@@ -44,6 +57,44 @@ export default function DashboardHome({
     <>
       <DashboardStats stats={stats} />
 
+      {showYearFilters ? (
+        <div style={cardStyle}>
+          <h2 style={sectionTitleStyle}>Dashboard Years</h2>
+          <p style={sectionCopyStyle}>
+            Choose one or more year levels to filter the dashboard, or leave all years selected.
+          </p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              style={{
+                ...navButtonStyle,
+                ...(selectedYearLevels.length === 0 ? navButtonActiveStyle : {}),
+              }}
+              onClick={onClearYearLevels}
+            >
+              All years
+            </button>
+            {availableYearLevels.map((yearLevel) => {
+              const selected = selectedYearLevels.includes(yearLevel);
+
+              return (
+                <button
+                  key={yearLevel}
+                  type="button"
+                  style={{
+                    ...navButtonStyle,
+                    ...(selected ? navButtonActiveStyle : {}),
+                  }}
+                  onClick={() => onToggleYearLevel(yearLevel)}
+                >
+                  Year {yearLevel}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
       <div style={twoColStyle}>
         <div style={cardStyle}>
           <h2 style={sectionTitleStyle}>Chronicle Watchlist</h2>
@@ -60,7 +111,7 @@ export default function DashboardHome({
                 onClick={() => setSelectedStudent(student.name)}
               >
                 <div style={{ fontWeight: "bold" }}>{student.name}</div>
-                <div style={{ color: "#4b587c" }}>
+                <div style={{ color: brandPalette.muted }}>
                   {student.count} Chronicle records
                 </div>
               </div>
@@ -68,6 +119,32 @@ export default function DashboardHome({
           )}
         </div>
 
+        <div style={cardStyle}>
+          <h2 style={sectionTitleStyle}>Chronicle 2+ This Week</h2>
+          <p style={sectionCopyStyle}>
+            Students with two or more Chronicle records in the current tracked week.
+          </p>
+          {chronicleTwoPlusThisWeek.length === 0 ? (
+            <p>No students have reached two Chronicle records this week yet.</p>
+          ) : (
+            chronicleTwoPlusThisWeek.map((student) => (
+              <div
+                key={student.key}
+                style={{ ...entryCardStyle, cursor: "pointer" }}
+                onClick={() => setSelectedStudent(student.name)}
+              >
+                <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                <div style={{ color: brandPalette.muted }}>
+                  {student.count} Chronicle records · {student.weekLabel}
+                  {student.homegroup ? ` · ${student.homegroup}` : ""}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div style={twoColStyle}>
         <div style={cardStyle}>
           <h2 style={sectionTitleStyle}>Attendance Watchlist</h2>
           <p style={sectionCopyStyle}>
@@ -83,8 +160,32 @@ export default function DashboardHome({
                 onClick={() => setSelectedStudent(student.name)}
               >
                 <div style={{ fontWeight: "bold" }}>{student.name}</div>
-                <div style={{ color: "#4b587c" }}>
+                <div style={{ color: brandPalette.muted }}>
                   {student.count} late arrivals
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={cardStyle}>
+          <h2 style={sectionTitleStyle}>Attendance 2+ This Week</h2>
+          <p style={sectionCopyStyle}>
+            Students with two or more attendance incidents in the current tracked week.
+          </p>
+          {attendanceTwoPlusThisWeek.length === 0 ? (
+            <p>No students have reached two attendance incidents this week yet.</p>
+          ) : (
+            attendanceTwoPlusThisWeek.map((student) => (
+              <div
+                key={student.key}
+                style={{ ...entryCardStyle, cursor: "pointer" }}
+                onClick={() => setSelectedStudent(student.name)}
+              >
+                <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                <div style={{ color: brandPalette.muted }}>
+                  {student.count} attendance incidents · {student.weekLabel}
+                  {student.homegroup ? ` · ${student.homegroup}` : ""}
                 </div>
               </div>
             ))
@@ -92,27 +193,35 @@ export default function DashboardHome({
         </div>
       </div>
 
-      <div style={cardStyle}>
-        <h2 style={sectionTitleStyle}>Detention Watchlist</h2>
-        <p style={sectionCopyStyle}>
-          Students with the highest number of detention entries.
-        </p>
-        {topDetentionStudents.length === 0 ? (
-          <p>No detention records loaded yet.</p>
-        ) : (
-          topDetentionStudents.map((student) => (
-            <div
-              key={`detention-${student.name}`}
-              style={{ ...entryCardStyle, cursor: "pointer" }}
-              onClick={() => setSelectedStudent(student.name)}
-            >
-              <div style={{ fontWeight: "bold" }}>{student.name}</div>
-              <div style={{ color: "#4b587c" }}>
-                {student.count} detention records
+      <div style={twoColStyle}>
+        <div style={cardStyle}>
+          <h2 style={sectionTitleStyle}>Detention Watchlist</h2>
+          <p style={sectionCopyStyle}>
+            Students with the highest number of detention entries.
+          </p>
+          {topDetentionStudents.length === 0 ? (
+            <p>No detention records loaded yet.</p>
+          ) : (
+            topDetentionStudents.map((student) => (
+              <div
+                key={`detention-${student.name}`}
+                style={{ ...entryCardStyle, cursor: "pointer" }}
+                onClick={() => setSelectedStudent(student.name)}
+              >
+                <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                <div style={{ color: brandPalette.muted }}>
+                  {student.count} detention records
+                </div>
               </div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
+
+        <UpcomingSessionAssignmentsCard
+          upcomingSession={upcomingSession}
+          assignedStudents={upcomingSessionAssignments}
+          setSelectedStudent={setSelectedStudent}
+        />
       </div>
 
       <div style={cardStyle}>
@@ -175,13 +284,15 @@ export default function DashboardHome({
                 <span
                   style={{
                     textDecoration: todo.done ? "line-through" : "none",
-                    color: todo.done ? "#6c6f72" : "#030c2e",
+                    color: todo.done ? "#6c6f72" : brandPalette.text,
                   }}
                 >
                   {todo.text}
                 </span>
               </label>
-              <div style={{ minWidth: 120, textAlign: "right", color: "#4b587c", fontSize: 13 }}>
+              <div
+                style={{ minWidth: 120, textAlign: "right", color: brandPalette.muted, fontSize: 13 }}
+              >
                 {todo.dueDate ? (
                   <div style={{ color: getTodoUrgencyStyles(todo).textColor }}>
                     Due {formatDueDate(todo.dueDate)}
@@ -240,7 +351,7 @@ function getTodoUrgencyStyles(todo) {
     return {
       border: entryCardStyle.border,
       background: entryCardStyle.background,
-      textColor: "#4b587c",
+      textColor: brandPalette.muted,
       label: "",
     };
   }
@@ -280,7 +391,7 @@ function getTodoUrgencyStyles(todo) {
   return {
     border: entryCardStyle.border,
     background: entryCardStyle.background,
-    textColor: "#4b587c",
+    textColor: brandPalette.muted,
     label: "",
   };
 }

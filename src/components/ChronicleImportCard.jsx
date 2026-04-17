@@ -1,16 +1,27 @@
 import { useMemo, useState } from "react";
 
 import {
+  brandPalette,
   buttonStyle,
   cardStyle,
   entryCardStyle,
   inputStyle,
   sectionCopyStyle,
   sectionTitleStyle,
+  statCardStyle,
+  statGridStyle,
+  statLabelStyle,
+  statValueStyle,
 } from "../styles/uiStyles";
 
 export default function ChronicleImportCard({
+  handleChronicleSync,
   handleChronicleUpload,
+  chronicleSyncYear,
+  setChronicleSyncYear,
+  chronicleSyncModifiedSince,
+  setChronicleSyncModifiedSince,
+  chronicleSyncing,
   chronicleSearch,
   setChronicleSearch,
   chronicleYearFilter,
@@ -35,26 +46,48 @@ export default function ChronicleImportCard({
 }) {
   const chronicleWeeks = useMemo(
     () =>
-      filteredChronicle.reduce((sections, group) => {
-        const existingSection = sections.find(
-          (section) => section.weekKey === group.weekKey
-        );
+      filteredChronicle
+        .reduce((sections, group) => {
+          const existingSection = sections.find(
+            (section) => section.weekKey === group.weekKey
+          );
 
-        if (existingSection) {
-          existingSection.groups.push(group);
+          if (existingSection) {
+            existingSection.groups.push(group);
+            return sections;
+          }
+
+          sections.push({
+            weekKey: group.weekKey,
+            weekLabel: group.weekLabel,
+            groups: [group],
+          });
+
           return sections;
-        }
-
-        sections.push({
-          weekKey: group.weekKey,
-          weekLabel: group.weekLabel,
-          groups: [group],
-        });
-
-        return sections;
-      }, []),
+        }, [])
+        .sort((a, b) => b.weekKey.localeCompare(a.weekKey)),
     [filteredChronicle]
   );
+  const summary = useMemo(() => {
+    const candidateCount = filteredChronicle.length;
+    const incidentCount = filteredChronicle.reduce(
+      (total, group) => total + group.rows.length,
+      0
+    );
+    const thresholdCount = filteredChronicle.filter((group) => group.count >= 3).length;
+    const readyCount = filteredChronicle.filter((group) => {
+      const status = getChronicleStatus(group);
+      return group.count >= 3 && !status.assigned;
+    }).length;
+
+    return {
+      weekCount: chronicleWeeks.length,
+      candidateCount,
+      incidentCount,
+      thresholdCount,
+      readyCount,
+    };
+  }, [chronicleWeeks.length, filteredChronicle, getChronicleStatus]);
   const [expandedWeeks, setExpandedWeeks] = useState({});
   const [uploadInputKey, setUploadInputKey] = useState(0);
 
@@ -73,9 +106,37 @@ export default function ChronicleImportCard({
   return (
     <>
       <div style={cardStyle}>
-        <h2 style={sectionTitleStyle}>Chronicle Import</h2>
+        <h2 style={sectionTitleStyle}>Chronicle Sync</h2>
         <p style={sectionCopyStyle}>
-          Upload a Chronicle CSV file to save or update behaviour records in the database.
+          Sync Chronicle data directly from Compass, or use a CSV upload as a fallback.
+        </p>
+        <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+          <input
+            style={inputStyle}
+            type="number"
+            min="2000"
+            max="2100"
+            placeholder="Year"
+            value={chronicleSyncYear}
+            onChange={(event) => setChronicleSyncYear(event.target.value)}
+          />
+          <input
+            style={inputStyle}
+            type="date"
+            value={chronicleSyncModifiedSince}
+            onChange={(event) => setChronicleSyncModifiedSince(event.target.value)}
+          />
+          <button
+            type="button"
+            style={buttonStyle}
+            onClick={handleChronicleSync}
+            disabled={chronicleSyncing}
+          >
+            {chronicleSyncing ? "Syncing..." : "Sync from Compass"}
+          </button>
+        </div>
+        <p style={{ ...sectionCopyStyle, marginTop: 14 }}>
+          CSV fallback
         </p>
         <input
           key={uploadInputKey}
@@ -91,6 +152,28 @@ export default function ChronicleImportCard({
         <p style={sectionCopyStyle}>
           Filter imported Chronicle entries, review weekly groupings, and assign eligible students to sessions.
         </p>
+        <div style={statGridStyle}>
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>Weeks</div>
+            <div style={statValueStyle}>{summary.weekCount}</div>
+          </div>
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>Student Weeks</div>
+            <div style={statValueStyle}>{summary.candidateCount}</div>
+          </div>
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>Incidents</div>
+            <div style={statValueStyle}>{summary.incidentCount}</div>
+          </div>
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>3+ Threshold</div>
+            <div style={statValueStyle}>{summary.thresholdCount}</div>
+          </div>
+          <div style={statCardStyle}>
+            <div style={statLabelStyle}>Ready To Assign</div>
+            <div style={statValueStyle}>{summary.readyCount}</div>
+          </div>
+        </div>
         <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
           <input
             style={inputStyle}
@@ -162,7 +245,7 @@ export default function ChronicleImportCard({
                     fontWeight: 700,
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
-                    color: "#bf721f",
+                    color: brandPalette.mintStrong,
                     marginBottom: 10,
                     cursor: "pointer",
                   }}
@@ -175,16 +258,44 @@ export default function ChronicleImportCard({
                   ? week.groups.map((group) => {
                   const status = getChronicleStatus(group);
                   const canSelect = group.count >= 3 && !status.assigned;
+                  const isReady = group.count >= 3 && !status.assigned;
+                  const badgeLabel = status.assigned
+                    ? "Assigned"
+                    : isReady
+                      ? "Threshold met"
+                      : "Monitoring";
+                  const badgeStyle = status.assigned
+                    ? {
+                        color: brandPalette.navy,
+                        background: brandPalette.mintSoft,
+                        border: "1px solid rgba(92,231,170,0.45)",
+                      }
+                    : isReady
+                      ? {
+                          color: brandPalette.navyDeep,
+                          background: "rgba(92,231,170,0.16)",
+                          border: "1px solid rgba(92,231,170,0.45)",
+                        }
+                      : {
+                          color: brandPalette.navy,
+                          background: "rgba(17,44,71,0.06)",
+                          border: "1px solid rgba(17,44,71,0.12)",
+                        };
 
                   return (
                     <div
                       key={group.key}
                       style={{
-                        border:
-                          group.count >= 3 ? "2px solid #bf721f" : "1px solid #d0d1d7",
-                        padding: 10,
+                        border: isReady
+                          ? `2px solid ${brandPalette.mintStrong}`
+                          : `1px solid ${brandPalette.border}`,
+                        padding: 14,
                         marginBottom: 10,
                         cursor: "pointer",
+                        borderRadius: 18,
+                        background: isReady
+                          ? "rgba(92,231,170,0.1)"
+                          : "rgba(255,255,255,0.82)",
                       }}
                       onClick={() => setSelectedChronicleKey(group.key)}
                     >
@@ -223,8 +334,36 @@ export default function ChronicleImportCard({
                                 );
                               }}
                             >
-                              <strong>{group.name}</strong> - {group.count}
+                              <strong>{group.name}</strong>
                             </button>
+                            <div
+                              style={{
+                                marginTop: 6,
+                                display: "flex",
+                                gap: 8,
+                                flexWrap: "wrap",
+                                alignItems: "center",
+                                color: brandPalette.muted,
+                                fontSize: 13,
+                              }}
+                            >
+                              <span>{group.count} Chronicle{group.count === 1 ? "" : "s"}</span>
+                              {group.homegroup ? <span>{group.homegroup}</span> : null}
+                              {group.yearLevel ? <span>Year {group.yearLevel}</span> : null}
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  padding: "5px 10px",
+                                  borderRadius: 999,
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  ...badgeStyle,
+                                }}
+                              >
+                                {badgeLabel}
+                              </span>
+                            </div>
                           </div>
                         </div>
                         <div style={{ textAlign: "right" }}>

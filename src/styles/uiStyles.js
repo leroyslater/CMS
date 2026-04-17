@@ -1,8 +1,20 @@
+export const brandPalette = {
+  navy: "#14314b",
+  navyDeep: "#0f2840",
+  mint: "#5ce7aa",
+  mintStrong: "#39d592",
+  mintSoft: "#def9ee",
+  text: "#17334b",
+  muted: "#597489",
+  border: "#c8d8e1",
+  surface: "rgba(255,255,255,0.92)",
+};
+
 export const pageStyle = {
   fontFamily: '"Avenir Next", "Segoe UI", sans-serif',
   padding: 24,
   background:
-    "radial-gradient(circle at top left, rgba(191,114,31,0.16) 0, rgba(191,114,31,0.16) 14%, transparent 34%), linear-gradient(180deg, #f9f9fa 0%, #e4e9f1 100%)",
+    "radial-gradient(circle at top left, rgba(92,231,170,0.18) 0, rgba(92,231,170,0.18) 14%, transparent 34%), linear-gradient(180deg, #f6fafc 0%, #dce7ef 100%)",
   minHeight: "100vh",
 };
 
@@ -14,12 +26,12 @@ export const twoColStyle = {
 
 export const cardStyle = {
   maxWidth: 960,
-  background: "rgba(255,255,255,0.9)",
+  background: brandPalette.surface,
   backdropFilter: "blur(14px)",
   borderRadius: 24,
   padding: 24,
-  boxShadow: "0 20px 45px rgba(3, 12, 46, 0.08)",
-  border: "1px solid rgba(7, 28, 116, 0.12)",
+  boxShadow: "0 20px 45px rgba(17, 44, 71, 0.1)",
+  border: "1px solid rgba(17, 44, 71, 0.1)",
   marginBottom: 20,
 };
 
@@ -29,8 +41,8 @@ export const authCardStyle = {
   background: "rgba(255,255,255,0.94)",
   padding: 32,
   borderRadius: 28,
-  boxShadow: "0 30px 60px rgba(3, 12, 46, 0.12)",
-  border: "1px solid rgba(7, 28, 116, 0.12)",
+  boxShadow: "0 30px 60px rgba(17, 44, 71, 0.14)",
+  border: "1px solid rgba(17, 44, 71, 0.1)",
 };
 
 export const topBarStyle = {
@@ -39,12 +51,11 @@ export const topBarStyle = {
   alignItems: "center",
   marginBottom: 24,
   gap: 16,
-  padding: "28px 30px",
+  padding: "22px 26px",
   borderRadius: 30,
-  background:
-    "linear-gradient(135deg, rgba(3, 12, 46, 0.98) 0%, rgba(7, 28, 116, 0.95) 100%)",
+  background: "#14314b",
   color: "#fff",
-  boxShadow: "0 22px 44px rgba(3, 12, 46, 0.22)",
+  boxShadow: "0 16px 30px rgba(15, 40, 64, 0.16)",
 };
 
 export const inputStyle = {
@@ -53,10 +64,10 @@ export const inputStyle = {
   padding: "13px 14px",
   marginBottom: 12,
   borderRadius: 14,
-  border: "1px solid #d0d1d7",
+  border: `1px solid ${brandPalette.border}`,
   boxSizing: "border-box",
   background: "rgba(255,255,255,0.96)",
-  color: "#030c2e",
+  color: brandPalette.text,
   fontSize: 15,
 };
 
@@ -64,26 +75,38 @@ export const buttonStyle = {
   padding: "12px 18px",
   borderRadius: 999,
   border: "none",
-  background: "linear-gradient(135deg, #071c74 0%, #030c2e 100%)",
-  color: "white",
+  background: `linear-gradient(135deg, ${brandPalette.mintStrong} 0%, ${brandPalette.mint} 100%)`,
+  color: brandPalette.navyDeep,
+  cursor: "pointer",
+  fontWeight: 800,
+  letterSpacing: "0.02em",
+  boxShadow: "0 10px 22px rgba(57, 213, 146, 0.22)",
+};
+
+export const secondaryButtonStyle = {
+  padding: "10px 14px",
+  borderRadius: 999,
+  border: `1px solid ${brandPalette.border}`,
+  background: "rgba(255,255,255,0.76)",
+  color: brandPalette.navy,
   cursor: "pointer",
   fontWeight: 700,
   letterSpacing: "0.02em",
-  boxShadow: "0 10px 22px rgba(3, 12, 46, 0.18)",
+  boxShadow: "0 8px 18px rgba(17, 44, 71, 0.08)",
 };
 
 export const smallButtonStyle = {
   padding: "10px 14px",
   borderRadius: 999,
   border: "1px solid rgba(255,255,255,0.28)",
-  background: "rgba(255,255,255,0.1)",
+  background: "rgba(92,231,170,0.12)",
   cursor: "pointer",
   color: "inherit",
   fontWeight: 600,
 };
 
 export const entryCardStyle = {
-  border: "1px solid #dcdde1",
+  border: `1px solid ${brandPalette.border}`,
   borderRadius: 18,
   padding: 14,
   marginBottom: 12,
@@ -103,14 +126,14 @@ export const sectionTitleStyle = {
   marginTop: 0,
   marginBottom: 6,
   fontSize: 24,
-  color: "#030c2e",
+  color: brandPalette.text,
   letterSpacing: "-0.03em",
 };
 
 export const sectionCopyStyle = {
   marginTop: 0,
   marginBottom: 18,
-  color: "#4b587c",
+  color: brandPalette.muted,
   fontSize: 14,
 };
 
@@ -118,9 +141,9 @@ export const statusSuccessStyle = {
   margin: "0 0 16px",
   padding: "12px 14px",
   borderRadius: 16,
-  background: "#eef4ff",
-  border: "1px solid #c7d2fc",
-  color: "#071c74",
+  background: brandPalette.mintSoft,
+  border: "1px solid rgba(92,231,170,0.45)",
+  color: brandPalette.navy,
 };
 
 export const statusErrorStyle = {
@@ -143,15 +166,15 @@ export const statCardStyle = {
   borderRadius: 22,
   padding: 18,
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid rgba(7, 28, 116, 0.12)",
-  boxShadow: "0 12px 28px rgba(3, 12, 46, 0.06)",
+  border: "1px solid rgba(17, 44, 71, 0.1)",
+  boxShadow: "0 12px 28px rgba(17, 44, 71, 0.08)",
 };
 
 export const statLabelStyle = {
   fontSize: 12,
   textTransform: "uppercase",
   letterSpacing: "0.08em",
-  color: "#bf721f",
+  color: brandPalette.mintStrong,
   marginBottom: 10,
   fontWeight: 700,
 };
@@ -160,7 +183,7 @@ export const statValueStyle = {
   fontSize: 32,
   lineHeight: 1,
   marginBottom: 8,
-  color: "#030c2e",
+  color: brandPalette.text,
   fontWeight: 700,
 };
 
@@ -174,18 +197,18 @@ export const navBarStyle = {
 export const navButtonStyle = {
   padding: "12px 18px",
   borderRadius: 999,
-  border: "1px solid rgba(7, 28, 116, 0.14)",
+  border: "1px solid rgba(17, 44, 71, 0.14)",
   background: "rgba(255,255,255,0.72)",
-  color: "#071c74",
+  color: brandPalette.navy,
   cursor: "pointer",
   fontWeight: 700,
   letterSpacing: "0.02em",
-  boxShadow: "0 8px 18px rgba(3, 12, 46, 0.06)",
+  boxShadow: "0 8px 18px rgba(17, 44, 71, 0.08)",
 };
 
 export const navButtonActiveStyle = {
-  background: "linear-gradient(135deg, #071c74 0%, #030c2e 100%)",
-  color: "#fff",
+  background: `linear-gradient(135deg, ${brandPalette.mintStrong} 0%, ${brandPalette.mint} 100%)`,
+  color: brandPalette.navyDeep,
   border: "1px solid transparent",
-  boxShadow: "0 10px 22px rgba(3, 12, 46, 0.18)",
+  boxShadow: "0 10px 22px rgba(57, 213, 146, 0.22)",
 };

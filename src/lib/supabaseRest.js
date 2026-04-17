@@ -1,25 +1,45 @@
 import { supabaseAnonKey, supabaseUrl } from "./supabaseClient";
 
 const REST_TIMEOUT_MS = 8000;
+const REST_PAGE_SIZE = 1000;
 
 export async function fetchTableRows(table, accessToken, orderBy) {
-  const searchParams = new URLSearchParams({
-    select: "*",
-  });
+  const rows = [];
+  let offset = 0;
 
-  if (orderBy) {
-    searchParams.set("order", `${orderBy.column}.${orderBy.ascending ? "asc" : "desc"}`);
+  while (true) {
+    const searchParams = new URLSearchParams({
+      select: "*",
+      limit: String(REST_PAGE_SIZE),
+      offset: String(offset),
+    });
+
+    if (orderBy) {
+      searchParams.set(
+        "order",
+        `${orderBy.column}.${orderBy.ascending ? "asc" : "desc"}`
+      );
+    }
+
+    const url = `${supabaseUrl}/rest/v1/${table}?${searchParams.toString()}`;
+    const response = await timedFetch(url, accessToken);
+
+    if (!response.ok) {
+      const message = await readErrorMessage(response);
+      throw new Error(message || `${table} request failed with HTTP ${response.status}`);
+    }
+
+    const page = await response.json();
+    rows.push(...page);
+
+    if (!Array.isArray(page) || page.length < REST_PAGE_SIZE) {
+      break;
+    }
+
+    offset += REST_PAGE_SIZE;
   }
 
-  const url = `${supabaseUrl}/rest/v1/${table}?${searchParams.toString()}`;
-  const response = await timedFetch(url, accessToken);
-
-  if (!response.ok) {
-    const message = await readErrorMessage(response);
-    throw new Error(message || `${table} request failed with HTTP ${response.status}`);
-  }
-
-  return response.json();
+  return rows;
 }
 
 export async function fetchProfile(userId, accessToken) {
