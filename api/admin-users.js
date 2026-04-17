@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 
 export default async function handler(req, res) {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const appUrl = process.env.APP_URL || "https://striketrack.org";
   const authHeader = req.headers.authorization || "";
@@ -11,7 +12,7 @@ export default async function handler(req, res) {
     ? authHeader.slice("Bearer ".length)
     : "";
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl || !serviceRoleKey || !supabaseAnonKey) {
     return res.status(500).json({ error: "Server auth configuration is missing." });
   }
 
@@ -26,7 +27,19 @@ export default async function handler(req, res) {
     },
   });
 
-  const requester = await getAdminRequester(adminSupabase, token);
+  const requesterSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  });
+
+  const requester = await getAdminRequester(requesterSupabase, adminSupabase);
   if (requester.error) {
     return res.status(requester.status).json({ error: requester.error });
   }
@@ -60,11 +73,11 @@ export default async function handler(req, res) {
   return res.status(405).json({ error: "Method not allowed." });
 }
 
-async function getAdminRequester(adminSupabase, token) {
+async function getAdminRequester(requesterSupabase, adminSupabase) {
   const {
     data: { user },
     error: userError,
-  } = await adminSupabase.auth.getUser(token);
+  } = await requesterSupabase.auth.getUser();
 
   if (userError || !user) {
     return { status: 401, error: "Invalid auth token." };

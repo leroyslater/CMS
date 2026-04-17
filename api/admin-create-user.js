@@ -8,13 +8,14 @@ export default async function handler(req, res) {
   }
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ")
     ? authHeader.slice("Bearer ".length)
     : "";
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl || !serviceRoleKey || !supabaseAnonKey) {
     return res.status(500).json({ error: "Server auth configuration is missing." });
   }
 
@@ -29,10 +30,22 @@ export default async function handler(req, res) {
     },
   });
 
+  const requesterSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  });
+
   const {
     data: { user: requester },
     error: requesterError,
-  } = await adminSupabase.auth.getUser(token);
+  } = await requesterSupabase.auth.getUser();
 
   if (requesterError || !requester) {
     return res.status(401).json({ error: "Invalid auth token." });
