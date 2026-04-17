@@ -150,7 +150,7 @@ export default function App() {
             { id: "sessions", label: "Sessions" },
             { id: "chronicle", label: "Chronicle" },
             { id: "attendance", label: "Attendance" },
-            { id: "students", label: "Student Upload" },
+            { id: "students", label: "Student" },
           ],
     [isSupervisor]
   );
@@ -192,8 +192,6 @@ export default function App() {
         setAuthError(error.message);
         return;
       }
-
-      setMessage("Logged in.");
     } catch (err) {
       setAuthError(err.message || "Authentication failed.");
     }
@@ -739,15 +737,30 @@ export default function App() {
     }
   }
 
-  async function handleAddTodo(taskText, dueDate) {
+  async function handleAddTodo(taskText, dueDate, studentName = null) {
     clearError();
     setMessage("");
     setCreatingTodo(true);
 
+    const userId = authSession?.user?.id;
+    if (!userId) {
+      setDataError("You need to be signed in before adding tasks.");
+      setCreatingTodo(false);
+      return false;
+    }
+
     try {
       const { data, error } = await supabase
         .from("todo_items")
-        .insert([{ task_text: taskText, is_done: false, due_date: dueDate }])
+        .insert([
+          {
+            user_id: userId,
+            student_name: studentName || null,
+            task_text: taskText,
+            is_done: false,
+            due_date: dueDate,
+          },
+        ])
         .select()
         .single();
 
@@ -758,7 +771,7 @@ export default function App() {
 
       if (data) {
         setTodos((prev) => [data, ...prev]);
-        setMessage("Task added.");
+        setMessage(studentName ? "Student follow-up added." : "Task added.");
       }
 
       return true;
@@ -772,11 +785,19 @@ export default function App() {
     setMessage("");
     setUpdatingTodoId(todoId);
 
+    const userId = authSession?.user?.id;
+    if (!userId) {
+      setDataError("You need to be signed in before updating tasks.");
+      setUpdatingTodoId(null);
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from("todo_items")
         .update({ is_done: !isDone })
-        .eq("id", todoId);
+        .eq("id", todoId)
+        .eq("user_id", userId);
 
       if (error) {
         setDataError(error.message);
@@ -799,8 +820,19 @@ export default function App() {
     setMessage("");
     setDeletingTodoId(todoId);
 
+    const userId = authSession?.user?.id;
+    if (!userId) {
+      setDataError("You need to be signed in before removing tasks.");
+      setDeletingTodoId(null);
+      return;
+    }
+
     try {
-      const { error } = await supabase.from("todo_items").delete().eq("id", todoId);
+      const { error } = await supabase
+        .from("todo_items")
+        .delete()
+        .eq("id", todoId)
+        .eq("user_id", userId);
 
       if (error) {
         setDataError(error.message);
@@ -1394,17 +1426,25 @@ export default function App() {
 
   const loadChronicleRowsEvent = useEffectEvent(loadChronicleRows);
 
-  async function loadTodos(accessToken = authSession?.access_token) {
-    if (!accessToken) {
+  async function loadTodos() {
+    const userId = authSession?.user?.id;
+
+    if (!userId) {
       setTodos([]);
       return [];
     }
 
     try {
-      const todoData = await fetchTableRows("todo_items", accessToken, {
-        column: "created_at",
-        ascending: false,
-      });
+      const { data: todoData, error } = await supabase
+        .from("todo_items")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
       const safeTodos = todoData || [];
       setTodos(safeTodos);
       return safeTodos;
@@ -1451,7 +1491,7 @@ export default function App() {
 
     loadChronicleRowsEvent(authSession.access_token);
     loadAttendanceRowsEvent(authSession.access_token);
-    loadTodosEvent(authSession.access_token);
+    loadTodosEvent();
   }, [authSession?.access_token, studentLookupByCode]);
 
   function getChronicleStatus(group) {
@@ -1915,11 +1955,15 @@ export default function App() {
               upcomingSessionAssignments={upcomingSessionAssignments}
               todos={todos.map((todo) => ({
                 id: todo.id,
+                studentName: todo.student_name,
                 text: todo.task_text,
                 done: todo.is_done,
                 dueDate: todo.due_date,
                 isOverdue: isTodoOverdue(todo.due_date, todo.is_done),
               }))}
+              studentOptions={dashboardStudents
+                .map((student) => `${student.first_name} ${student.last_name}`.trim())
+                .sort((a, b) => a.localeCompare(b))}
               creatingTodo={creatingTodo}
               updatingTodoId={updatingTodoId}
               deletingTodoId={deletingTodoId}

@@ -30,6 +30,7 @@ export default function DashboardHome({
   upcomingSession,
   upcomingSessionAssignments,
   todos,
+  studentOptions,
   creatingTodo,
   updatingTodoId,
   deletingTodoId,
@@ -40,6 +41,12 @@ export default function DashboardHome({
 }) {
   const [todoInput, setTodoInput] = useState("");
   const [todoDueDate, setTodoDueDate] = useState("");
+  const [followUpStudent, setFollowUpStudent] = useState("");
+  const [followUpDescription, setFollowUpDescription] = useState("");
+  const [followUpDueDate, setFollowUpDueDate] = useState("");
+
+  const generalTodos = todos.filter((todo) => !todo.studentName);
+  const studentFollowUps = todos.filter((todo) => todo.studentName);
 
   async function addTodo(event) {
     event.preventDefault();
@@ -50,6 +57,20 @@ export default function DashboardHome({
     if (ok) {
       setTodoInput("");
       setTodoDueDate("");
+    }
+  }
+
+  async function addStudentFollowUp(event) {
+    event.preventDefault();
+    const studentName = followUpStudent.trim();
+    const description = followUpDescription.trim();
+    if (!studentName || !description) return;
+
+    const ok = await onAddTodo(description, followUpDueDate || null, studentName);
+    if (ok) {
+      setFollowUpStudent("");
+      setFollowUpDescription("");
+      setFollowUpDueDate("");
     }
   }
 
@@ -224,114 +245,197 @@ export default function DashboardHome({
         />
       </div>
 
-      <div style={cardStyle}>
-        <h2 style={sectionTitleStyle}>To Do</h2>
-        <p style={sectionCopyStyle}>
-          Keep a short running list of follow-ups for the day.
-        </p>
-        <form
-          onSubmit={addTodo}
-          style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}
-        >
-          <input
-            style={{ ...inputStyle, flex: "1 1 320px", marginBottom: 0 }}
-            placeholder="Add a task"
-            value={todoInput}
-            onChange={(event) => setTodoInput(event.target.value)}
-          />
-          <input
-            style={{ ...inputStyle, flex: "0 0 180px", marginBottom: 0 }}
-            type="date"
-            value={todoDueDate}
-            onChange={(event) => setTodoDueDate(event.target.value)}
-          />
-          <button type="submit" style={buttonStyle}>
-            {creatingTodo ? "Adding..." : "Add task"}
-          </button>
-        </form>
+      <div style={twoColStyle}>
+        <div style={cardStyle}>
+          <h2 style={sectionTitleStyle}>To Do</h2>
+          <p style={sectionCopyStyle}>
+            Keep a short running list of follow-ups for the day.
+          </p>
+          <form
+            onSubmit={addTodo}
+            style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}
+          >
+            <input
+              style={{ ...inputStyle, flex: "1 1 320px", marginBottom: 0 }}
+              placeholder="Add a task"
+              value={todoInput}
+              onChange={(event) => setTodoInput(event.target.value)}
+            />
+            <input
+              style={{ ...inputStyle, flex: "0 0 180px", marginBottom: 0 }}
+              type="date"
+              value={todoDueDate}
+              onChange={(event) => setTodoDueDate(event.target.value)}
+            />
+            <button type="submit" style={buttonStyle}>
+              {creatingTodo ? "Adding..." : "Add task"}
+            </button>
+          </form>
 
-        {todos.length === 0 ? (
-          <p>No tasks yet.</p>
-        ) : (
-          todos.map((todo) => (
-            <div
-              key={todo.id}
-              style={{
-                ...entryCardStyle,
-                border: getTodoUrgencyStyles(todo).border,
-                background: getTodoUrgencyStyles(todo).background,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  flex: 1,
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={todo.done}
-                  disabled={updatingTodoId === todo.id}
-                  onChange={() => onToggleTodo(todo.id, todo.done)}
-                />
-                <span
-                  style={{
-                    textDecoration: todo.done ? "line-through" : "none",
-                    color: todo.done ? "#6c6f72" : brandPalette.text,
-                  }}
-                >
-                  {todo.text}
-                </span>
-              </label>
-              <div
-                style={{ minWidth: 120, textAlign: "right", color: brandPalette.muted, fontSize: 13 }}
-              >
-                {todo.dueDate ? (
-                  <div style={{ color: getTodoUrgencyStyles(todo).textColor }}>
-                    Due {formatDueDate(todo.dueDate)}
-                  </div>
-                ) : (
-                  <div>No due date</div>
-                )}
-                {getTodoUrgencyStyles(todo).label ? (
-                  <div
-                    style={{
-                      color: getTodoUrgencyStyles(todo).textColor,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {getTodoUrgencyStyles(todo).label}
-                  </div>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                style={{
-                  border: "1px solid #f1c7b1",
-                  background: "#fff2eb",
-                  color: "#8a341f",
-                  borderRadius: 999,
-                  padding: "8px 12px",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                }}
-                disabled={deletingTodoId === todo.id}
-                onClick={() => onDeleteTodo(todo.id)}
-              >
-                {deletingTodoId === todo.id ? "Removing..." : "Remove"}
-              </button>
-            </div>
-          ))
-        )}
+          {generalTodos.length === 0 ? (
+            <p>No tasks yet.</p>
+          ) : (
+            generalTodos.map((todo) => (
+              <TodoRow
+                key={todo.id}
+                todo={todo}
+                updatingTodoId={updatingTodoId}
+                deletingTodoId={deletingTodoId}
+                onToggleTodo={onToggleTodo}
+                onDeleteTodo={onDeleteTodo}
+              />
+            ))
+          )}
+        </div>
+
+        <div style={cardStyle}>
+          <h2 style={sectionTitleStyle}>Student Follow Up</h2>
+          <p style={sectionCopyStyle}>
+            Track a student, a short description, and the due date for the follow-up.
+          </p>
+          <form
+            onSubmit={addStudentFollowUp}
+            style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}
+          >
+            <input
+              list="dashboard-student-options"
+              style={{ ...inputStyle, flex: "1 1 260px", marginBottom: 0 }}
+              placeholder="Student name"
+              value={followUpStudent}
+              onChange={(event) => setFollowUpStudent(event.target.value)}
+            />
+            <input
+              style={{ ...inputStyle, flex: "2 1 320px", marginBottom: 0 }}
+              placeholder="Description"
+              value={followUpDescription}
+              onChange={(event) => setFollowUpDescription(event.target.value)}
+            />
+            <input
+              style={{ ...inputStyle, flex: "0 0 180px", marginBottom: 0 }}
+              type="date"
+              value={followUpDueDate}
+              onChange={(event) => setFollowUpDueDate(event.target.value)}
+            />
+            <button type="submit" style={buttonStyle}>
+              {creatingTodo ? "Adding..." : "Add follow-up"}
+            </button>
+          </form>
+          <datalist id="dashboard-student-options">
+            {studentOptions.map((studentName) => (
+              <option key={studentName} value={studentName} />
+            ))}
+          </datalist>
+
+          {studentFollowUps.length === 0 ? (
+            <p>No student follow-ups yet.</p>
+          ) : (
+            studentFollowUps.map((todo) => (
+              <TodoRow
+                key={todo.id}
+                todo={todo}
+                updatingTodoId={updatingTodoId}
+                deletingTodoId={deletingTodoId}
+                onToggleTodo={onToggleTodo}
+                onDeleteTodo={onDeleteTodo}
+                showStudentName
+              />
+            ))
+          )}
+        </div>
       </div>
     </>
+  );
+}
+
+function TodoRow({
+  todo,
+  updatingTodoId,
+  deletingTodoId,
+  onToggleTodo,
+  onDeleteTodo,
+  showStudentName = false,
+}) {
+  return (
+    <div
+      style={{
+        ...entryCardStyle,
+        border: getTodoUrgencyStyles(todo).border,
+        background: getTodoUrgencyStyles(todo).background,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 12,
+      }}
+    >
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flex: 1,
+          cursor: "pointer",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={todo.done}
+          disabled={updatingTodoId === todo.id}
+          onChange={() => onToggleTodo(todo.id, todo.done)}
+        />
+        <div>
+          {showStudentName && todo.studentName ? (
+            <div style={{ fontWeight: 700, color: brandPalette.text, marginBottom: 4 }}>
+              {todo.studentName}
+            </div>
+          ) : null}
+          <div
+            style={{
+              textDecoration: todo.done ? "line-through" : "none",
+              color: todo.done ? "#6c6f72" : brandPalette.text,
+            }}
+          >
+            {todo.text}
+          </div>
+        </div>
+      </label>
+      <div
+        style={{ minWidth: 120, textAlign: "right", color: brandPalette.muted, fontSize: 13 }}
+      >
+        {todo.dueDate ? (
+          <div style={{ color: getTodoUrgencyStyles(todo).textColor }}>
+            Due {formatDueDate(todo.dueDate)}
+          </div>
+        ) : (
+          <div>No due date</div>
+        )}
+        {getTodoUrgencyStyles(todo).label ? (
+          <div
+            style={{
+              color: getTodoUrgencyStyles(todo).textColor,
+              fontWeight: 700,
+            }}
+          >
+            {getTodoUrgencyStyles(todo).label}
+          </div>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        style={{
+          border: "1px solid #f1c7b1",
+          background: "#fff2eb",
+          color: "#8a341f",
+          borderRadius: 999,
+          padding: "8px 12px",
+          cursor: "pointer",
+          fontWeight: 700,
+        }}
+        disabled={deletingTodoId === todo.id}
+        onClick={() => onDeleteTodo(todo.id)}
+      >
+        {deletingTodoId === todo.id ? "Removing..." : "Remove"}
+      </button>
+    </div>
   );
 }
 
