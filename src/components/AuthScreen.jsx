@@ -24,7 +24,17 @@ export default function AuthScreen({
   return (
     <div style={pageStyle}>
       <div style={authCardStyle}>
-        <div style={{ marginBottom: 18, display: "flex", justifyContent: "flex-start" }}>
+        <div
+          style={{
+            marginBottom: 18,
+            display: "flex",
+            justifyContent: "flex-start",
+            background: brandPalette.navy,
+            borderRadius: 24,
+            padding: "18px 22px",
+            boxShadow: "0 16px 30px rgba(15, 40, 64, 0.14)",
+          }}
+        >
           <StrikeTrackLogo size={184} variant="dark" />
         </div>
         <p
