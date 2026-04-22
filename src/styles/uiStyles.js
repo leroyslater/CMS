@@ -194,6 +194,16 @@ export const navBarStyle = {
   marginBottom: 22,
 };
 
+export const mobileNavBarStyle = {
+  display: "flex",
+  gap: 8,
+  overflowX: "auto",
+  padding: "2px 2px 8px",
+  marginBottom: 18,
+  scrollbarWidth: "none",
+  WebkitOverflowScrolling: "touch",
+};
+
 export const navButtonStyle = {
   padding: "12px 18px",
   borderRadius: 999,
@@ -211,4 +221,13 @@ export const navButtonActiveStyle = {
   color: brandPalette.navyDeep,
   border: "1px solid transparent",
   boxShadow: "0 10px 22px rgba(57, 213, 146, 0.22)",
+};
+
+export const mobileNavButtonStyle = {
+  ...navButtonStyle,
+  padding: "10px 14px",
+  fontSize: 14,
+  whiteSpace: "nowrap",
+  flex: "0 0 auto",
+  minWidth: "fit-content",
 };

@@ -38,26 +38,45 @@ export default function AttendanceImportCard({
   assignAttendanceGroupToSession,
   selectedAttendanceGroup,
 }) {
+  function formatSchoolWeekHeading(weekKey, fallbackLabel) {
+    const weekStart = parseIsoDate(weekKey);
+    if (!weekStart) return fallbackLabel;
+
+    const weekEnding = new Date(weekStart);
+    weekEnding.setDate(weekEnding.getDate() + 7);
+
+    const termWeek = getVictorianTermWeek(weekEnding);
+    const formattedDate = formatDateDisplay(weekEnding);
+
+    if (!termWeek) {
+      return `Week Ending: ${formattedDate}`;
+    }
+
+    return `Term ${termWeek.term} Week ${termWeek.week}: ${formattedDate}`;
+  }
+
   const attendanceWeeks = useMemo(
     () =>
-      filteredAttendance.reduce((sections, group) => {
-        const existingSection = sections.find(
-          (section) => section.weekKey === group.weekKey
-        );
+      filteredAttendance
+        .reduce((sections, group) => {
+          const existingSection = sections.find(
+            (section) => section.weekKey === group.weekKey
+          );
 
-        if (existingSection) {
-          existingSection.groups.push(group);
+          if (existingSection) {
+            existingSection.groups.push(group);
+            return sections;
+          }
+
+          sections.push({
+            weekKey: group.weekKey,
+            weekLabel: group.weekLabel,
+            groups: [group],
+          });
+
           return sections;
-        }
-
-        sections.push({
-          weekKey: group.weekKey,
-          weekLabel: group.weekLabel,
-          groups: [group],
-        });
-
-        return sections;
-      }, []),
+        }, [])
+        .sort((a, b) => b.weekKey.localeCompare(a.weekKey)),
     [filteredAttendance]
   );
   const [expandedWeeks, setExpandedWeeks] = useState({});
@@ -90,7 +109,6 @@ export default function AttendanceImportCard({
       classLateCount,
     };
   }, [filteredAttendance]);
-
   function toggleWeek(weekKey) {
     setExpandedWeeks((prev) => ({
       ...prev,
@@ -224,7 +242,7 @@ export default function AttendanceImportCard({
                   }}
                   onClick={() => toggleWeek(week.weekKey)}
                 >
-                  <span>Week: {week.weekLabel}</span>
+                  <span>{formatSchoolWeekHeading(week.weekKey, week.weekLabel)}</span>
                   <span>{expandedWeeks[week.weekKey] ? "Hide" : "Show"}</span>
                 </div>
                 {expandedWeeks[week.weekKey]
@@ -384,4 +402,48 @@ export default function AttendanceImportCard({
       </div>
     </>
   );
+}
+
+const VICTORIAN_TERM_WEEKS_2026 = [
+  { term: 1, firstWeekEnding: "2026-01-30", lastWeekEnding: "2026-04-03" },
+  { term: 2, firstWeekEnding: "2026-04-24", lastWeekEnding: "2026-06-26" },
+  { term: 3, firstWeekEnding: "2026-07-17", lastWeekEnding: "2026-09-18" },
+  { term: 4, firstWeekEnding: "2026-10-09", lastWeekEnding: "2026-12-18" },
+];
+
+function parseIsoDate(value) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDateDisplay(date) {
+  return date.toLocaleDateString("en-AU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function getVictorianTermWeek(weekEndingDate) {
+  const weekEndingKey = [
+    weekEndingDate.getFullYear(),
+    String(weekEndingDate.getMonth() + 1).padStart(2, "0"),
+    String(weekEndingDate.getDate()).padStart(2, "0"),
+  ].join("-");
+
+  const term = VICTORIAN_TERM_WEEKS_2026.find(
+    (item) =>
+      weekEndingKey >= item.firstWeekEnding && weekEndingKey <= item.lastWeekEnding
+  );
+
+  if (!term) return null;
+
+  const firstWeekEnding = parseIsoDate(term.firstWeekEnding);
+  const weekOffset = Math.round((weekEndingDate - firstWeekEnding) / 604800000);
+
+  return {
+    term: term.term,
+    week: weekOffset + 1,
+  };
 }

@@ -1,6 +1,9 @@
 import strikeTrackLogo from "../assets/strike-track-logo-transparent.png";
 
-export default function StrikeTrackLogo({ size = 56, variant = "light" }) {
+export default function StrikeTrackLogo({
+  size = 56,
+  variant = "light",
+}) {
   const isDark = variant === "dark";
 
   return (

@@ -1,4 +1,5 @@
 import { smallButtonStyle, topBarStyle } from "../styles/uiStyles";
+import { useEffect, useState } from "react";
 import StrikeTrackLogo from "./StrikeTrackLogo";
 
 export default function AppHeader({
@@ -6,12 +7,38 @@ export default function AppHeader({
   onOpenAccount,
   accountActive,
 }) {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth <= 768 : false
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    function updateIsMobile() {
+      setIsMobile(window.innerWidth <= 768);
+    }
+
+    updateIsMobile();
+    window.addEventListener("resize", updateIsMobile);
+    return () => window.removeEventListener("resize", updateIsMobile);
+  }, []);
+
+  const mobileButtonSize = isMobile ? 38 : 44;
+
   return (
-    <div style={topBarStyle}>
+    <div
+      style={{
+        ...topBarStyle,
+        padding: isMobile ? "10px 12px" : topBarStyle.padding,
+        marginBottom: isMobile ? 12 : topBarStyle.marginBottom,
+        borderRadius: isMobile ? 18 : topBarStyle.borderRadius,
+        gap: isMobile ? 8 : topBarStyle.gap,
+      }}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-start" }}>
-        <StrikeTrackLogo size={164} />
+        <StrikeTrackLogo size={isMobile ? 132 : 164} />
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 6 : 12, flexWrap: "wrap" }}>
         <button
           type="button"
           style={{
@@ -19,8 +46,8 @@ export default function AppHeader({
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 44,
-            height: 44,
+            width: mobileButtonSize,
+            height: mobileButtonSize,
             padding: 0,
             border: accountActive
               ? "1px solid rgba(92,231,170,0.7)"
@@ -33,7 +60,7 @@ export default function AppHeader({
           aria-label="Open account"
           title="Account"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <svg width={isMobile ? "16" : "18"} height={isMobile ? "16" : "18"} viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
               d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z"
               stroke="currentColor"
@@ -54,15 +81,15 @@ export default function AppHeader({
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 44,
-            height: 44,
+            width: mobileButtonSize,
+            height: mobileButtonSize,
             padding: 0,
           }}
           onClick={handleLogout}
           aria-label="Logout"
           title="Logout"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <svg width={isMobile ? "16" : "18"} height={isMobile ? "16" : "18"} viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
               d="M10 17L15 12L10 7"
               stroke="currentColor"

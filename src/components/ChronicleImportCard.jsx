@@ -44,6 +44,26 @@ export default function ChronicleImportCard({
   assignChronicleGroupToSession,
   selectedChronicleGroup,
 }) {
+  function formatSchoolWeekHeading(groups, fallbackLabel) {
+    const incidentDate =
+      groups
+        .flatMap((group) => group.rows || [])
+        .map((row) => row.occurredDate)
+        .find(Boolean) || null;
+    if (!incidentDate) return fallbackLabel;
+
+    const weekEnding = getSchoolWeekEndingDate(incidentDate);
+
+    const termWeek = getVictorianTermWeek(weekEnding);
+    const formattedDate = formatDateDisplay(weekEnding);
+
+    if (!termWeek) {
+      return `Week Ending: ${formattedDate}`;
+    }
+
+    return `Term ${termWeek.term} Week ${termWeek.week}: ${formattedDate}`;
+  }
+
   const chronicleWeeks = useMemo(
     () =>
       filteredChronicle
@@ -251,7 +271,7 @@ export default function ChronicleImportCard({
                   }}
                   onClick={() => toggleWeek(week.weekKey)}
                 >
-                  <span>Week: {week.weekLabel}</span>
+                  <span>{formatSchoolWeekHeading(week.groups, week.weekLabel)}</span>
                   <span>{expandedWeeks[week.weekKey] ? "Hide" : "Show"}</span>
                 </div>
                 {expandedWeeks[week.weekKey]
@@ -420,4 +440,55 @@ export default function ChronicleImportCard({
       </div>
     </>
   );
+}
+
+const VICTORIAN_TERM_WEEKS_2026 = [
+  { term: 1, firstWeekEnding: "2026-01-30", lastWeekEnding: "2026-04-03" },
+  { term: 2, firstWeekEnding: "2026-04-24", lastWeekEnding: "2026-06-26" },
+  { term: 3, firstWeekEnding: "2026-07-17", lastWeekEnding: "2026-09-18" },
+  { term: 4, firstWeekEnding: "2026-10-09", lastWeekEnding: "2026-12-18" },
+];
+
+function parseIsoDate(value) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDateDisplay(date) {
+  return date.toLocaleDateString("en-AU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function getVictorianTermWeek(weekEndingDate) {
+  const weekEndingKey = [
+    weekEndingDate.getFullYear(),
+    String(weekEndingDate.getMonth() + 1).padStart(2, "0"),
+    String(weekEndingDate.getDate()).padStart(2, "0"),
+  ].join("-");
+
+  const term = VICTORIAN_TERM_WEEKS_2026.find(
+    (item) =>
+      weekEndingKey >= item.firstWeekEnding && weekEndingKey <= item.lastWeekEnding
+  );
+
+  if (!term) return null;
+
+  const firstWeekEnding = parseIsoDate(term.firstWeekEnding);
+  const weekOffset = Math.round((weekEndingDate - firstWeekEnding) / 604800000);
+
+  return {
+    term: term.term,
+    week: weekOffset + 1,
+  };
+}
+
+function getSchoolWeekEndingDate(date) {
+  const weekEnding = new Date(date);
+  const daysUntilFriday = (5 - weekEnding.getDay() + 7) % 7;
+  weekEnding.setDate(weekEnding.getDate() + daysUntilFriday);
+  return weekEnding;
 }

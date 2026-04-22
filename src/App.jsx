@@ -19,6 +19,8 @@ import { useDetentionData } from "./hooks/useDetentionData";
 import { fetchTableRows, upsertTableRows } from "./lib/supabaseRest";
 import { supabase } from "./lib/supabaseClient";
 import {
+  mobileNavBarStyle,
+  mobileNavButtonStyle,
   navBarStyle,
   navButtonActiveStyle,
   navButtonStyle,
@@ -113,6 +115,9 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [activePage, setActivePage] = useState("dashboard");
   const [dashboardYearFilter, setDashboardYearFilter] = useState([]);
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth <= 768 : false
+  );
   const error = authError || dataError;
   const currentEntry = newEntry.sessionId
     ? newEntry
@@ -171,6 +176,18 @@ export default function App() {
     if (!authSession || passwordRecoveryMode) return;
     setActivePage(isSupervisor ? "sessions" : "dashboard");
   }, [authSession, isSupervisor, passwordRecoveryMode]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    function updateIsMobile() {
+      setIsMobile(window.innerWidth <= 768);
+    }
+
+    updateIsMobile();
+    window.addEventListener("resize", updateIsMobile);
+    return () => window.removeEventListener("resize", updateIsMobile);
+  }, []);
 
   function clearError() {
     setAuthError("");
@@ -1797,10 +1814,12 @@ export default function App() {
 
   const chronicleTwoPlusThisWeek = useMemo(
     () => {
-      const currentWeekKey = getFridayWeekKey(new Date());
+      const currentWeekEndingKey = getSchoolWeekEndingKey(new Date());
 
       return dashboardChronicleGrouped
-        .filter((group) => group.weekKey === currentWeekKey)
+        .filter((group) =>
+          isGroupInCurrentSchoolWeek(group.rows, "occurredDate", currentWeekEndingKey)
+        )
         .filter((group) => group.count >= 2)
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
         .slice(0, 8)
@@ -1848,10 +1867,12 @@ export default function App() {
   }, [dashboardAttendanceRows]);
 
   const attendanceTwoPlusThisWeek = useMemo(() => {
-    const currentWeekKey = getFridayWeekKey(new Date());
+    const currentWeekEndingKey = getSchoolWeekEndingKey(new Date());
 
     return dashboardAttendanceGrouped
-      .filter((group) => group.weekKey === currentWeekKey)
+      .filter((group) =>
+        isGroupInCurrentSchoolWeek(group.rows, "startAtDate", currentWeekEndingKey)
+      )
       .filter((group) => group.count >= 2)
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
       .slice(0, 8)
@@ -1913,21 +1934,39 @@ export default function App() {
       ) : (
         <>
           {!isSupervisor ? (
-            <div style={navBarStyle}>
-              {pages.map((page) => (
-                <button
-                  key={page.id}
-                  type="button"
-                  style={{
-                    ...navButtonStyle,
-                    ...(activePage === page.id ? navButtonActiveStyle : {}),
-                  }}
-                  onClick={() => setActivePage(page.id)}
-                >
-                  {page.label}
-                </button>
-              ))}
-            </div>
+            isMobile ? (
+              <div style={mobileNavBarStyle}>
+                {pages.map((page) => (
+                  <button
+                    key={page.id}
+                    type="button"
+                    style={{
+                      ...mobileNavButtonStyle,
+                      ...(activePage === page.id ? navButtonActiveStyle : {}),
+                    }}
+                    onClick={() => setActivePage(page.id)}
+                  >
+                    {page.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div style={navBarStyle}>
+                {pages.map((page) => (
+                  <button
+                    key={page.id}
+                    type="button"
+                    style={{
+                      ...navButtonStyle,
+                      ...(activePage === page.id ? navButtonActiveStyle : {}),
+                    }}
+                    onClick={() => setActivePage(page.id)}
+                  >
+                    {page.label}
+                  </button>
+                ))}
+              </div>
+            )
           ) : null}
 
           {activePage === "dashboard" ? (
@@ -2202,24 +2241,25 @@ function parseChronicleDate(value) {
   if (!value) return null;
 
   const text = String(value).trim();
+  const match = text.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i
+  );
+  if (match) {
+    let [, day, month, year, hour, minute, meridiem] = match;
+    let h = Number(hour);
+
+    if (meridiem.toUpperCase() === "PM" && h !== 12) h += 12;
+    if (meridiem.toUpperCase() === "AM" && h === 12) h = 0;
+
+    return new Date(Number(year), Number(month) - 1, Number(day), h, Number(minute));
+  }
+
   const nativeDate = new Date(text);
   if (!Number.isNaN(nativeDate.getTime())) {
     return nativeDate;
   }
 
-  const match = text.match(
-    /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i
-  );
-
-  if (!match) return null;
-
-  let [, day, month, year, hour, minute, meridiem] = match;
-  let h = Number(hour);
-
-  if (meridiem.toUpperCase() === "PM" && h !== 12) h += 12;
-  if (meridiem.toUpperCase() === "AM" && h === 12) h = 0;
-
-  return new Date(Number(year), Number(month) - 1, Number(day), h, Number(minute));
+  return null;
 }
 
 function formatDate(date) {
@@ -2268,6 +2308,25 @@ function getFridayWeekLabel(date) {
   end.setDate(end.getDate() + 6);
 
   return `${formatDate(start)} to ${formatDate(end)}`;
+}
+
+function getSchoolWeekEndingDate(date) {
+  const weekEnding = new Date(date);
+  const daysUntilFriday = (5 - weekEnding.getDay() + 7) % 7;
+  weekEnding.setDate(weekEnding.getDate() + daysUntilFriday);
+  return weekEnding;
+}
+
+function getSchoolWeekEndingKey(date) {
+  return formatDate(getSchoolWeekEndingDate(date));
+}
+
+function isGroupInCurrentSchoolWeek(rows, dateField, currentWeekEndingKey) {
+  return (rows || []).some((row) => {
+    const date = row?.[dateField];
+    if (!date) return false;
+    return getSchoolWeekEndingKey(date) === currentWeekEndingKey;
+  });
 }
 
 function createChronicleRecord(row) {

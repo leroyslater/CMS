@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   brandPalette,
@@ -6,6 +6,8 @@ import {
   cardStyle,
   entryCardStyle,
   inputStyle,
+  mobileNavBarStyle,
+  mobileNavButtonStyle,
   navButtonActiveStyle,
   navButtonStyle,
   sectionCopyStyle,
@@ -39,6 +41,9 @@ export default function DashboardHome({
   onDeleteTodo,
   setSelectedStudent,
 }) {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth <= 768 : false
+  );
   const [todoInput, setTodoInput] = useState("");
   const [todoDueDate, setTodoDueDate] = useState("");
   const [followUpStudent, setFollowUpStudent] = useState("");
@@ -47,6 +52,21 @@ export default function DashboardHome({
 
   const generalTodos = todos.filter((todo) => !todo.studentName);
   const studentFollowUps = todos.filter((todo) => todo.studentName);
+  const mobileTwoColStyle = isMobile
+    ? { ...twoColStyle, gridTemplateColumns: "1fr" }
+    : twoColStyle;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    function updateIsMobile() {
+      setIsMobile(window.innerWidth <= 768);
+    }
+
+    updateIsMobile();
+    window.addEventListener("resize", updateIsMobile);
+    return () => window.removeEventListener("resize", updateIsMobile);
+  }, []);
 
   async function addTodo(event) {
     event.preventDefault();
@@ -76,7 +96,7 @@ export default function DashboardHome({
 
   return (
     <>
-      <DashboardStats stats={stats} />
+      {isMobile ? null : <DashboardStats stats={stats} />}
 
       {showYearFilters ? (
         <div style={cardStyle}>
@@ -84,11 +104,17 @@ export default function DashboardHome({
           <p style={sectionCopyStyle}>
             Choose one or more year levels to filter the dashboard, or leave all years selected.
           </p>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div
+            style={
+              isMobile
+                ? mobileNavBarStyle
+                : { display: "flex", gap: 10, flexWrap: "wrap" }
+            }
+          >
             <button
               type="button"
               style={{
-                ...navButtonStyle,
+                ...(isMobile ? mobileNavButtonStyle : navButtonStyle),
                 ...(selectedYearLevels.length === 0 ? navButtonActiveStyle : {}),
               }}
               onClick={onClearYearLevels}
@@ -103,7 +129,7 @@ export default function DashboardHome({
                   key={yearLevel}
                   type="button"
                   style={{
-                    ...navButtonStyle,
+                    ...(isMobile ? mobileNavButtonStyle : navButtonStyle),
                     ...(selected ? navButtonActiveStyle : {}),
                   }}
                   onClick={() => onToggleYearLevel(yearLevel)}
@@ -116,127 +142,209 @@ export default function DashboardHome({
         </div>
       ) : null}
 
-      <div style={twoColStyle}>
-        <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Chronicle Watchlist</h2>
-          <p style={sectionCopyStyle}>
-            Students with the most Chronicle records across the imported data.
-          </p>
-          {topChronicleStudents.length === 0 ? (
-            <p>No Chronicle records loaded yet.</p>
-          ) : (
-            topChronicleStudents.map((student) => (
-              <div
-                key={`chronicle-${student.name}`}
-                style={{ ...entryCardStyle, cursor: "pointer" }}
-                onClick={() => setSelectedStudent(student.name)}
-              >
-                <div style={{ fontWeight: "bold" }}>{student.name}</div>
-                <div style={{ color: brandPalette.muted }}>
-                  {student.count} Chronicle records
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
+      <div style={mobileTwoColStyle}>
         <div style={cardStyle}>
           <h2 style={sectionTitleStyle}>Chronicle 2+ This Week</h2>
-          <p style={sectionCopyStyle}>
+          {isMobile ? null : (
+            <p style={sectionCopyStyle}>
             Students with two or more Chronicle records in the current tracked week.
-          </p>
+            </p>
+          )}
           {chronicleTwoPlusThisWeek.length === 0 ? (
             <p>No students have reached two Chronicle records this week yet.</p>
           ) : (
             chronicleTwoPlusThisWeek.map((student) => (
               <div
                 key={student.key}
-                style={{ ...entryCardStyle, cursor: "pointer" }}
+                style={{
+                  ...entryCardStyle,
+                  cursor: "pointer",
+                  border:
+                    student.count >= 3
+                      ? "2px solid #dc2626"
+                      : entryCardStyle.border,
+                  background:
+                    student.count >= 3 ? "#fef2f2" : entryCardStyle.background,
+                }}
                 onClick={() => setSelectedStudent(student.name)}
               >
-                <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    alignItems: "center",
+                  }}
+                >
+                  <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                  {student.count >= 3 ? (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        padding: "6px 10px",
+                        borderRadius: 999,
+                        fontSize: 12,
+                        fontWeight: 800,
+                        color: "#b91c1c",
+                        background: "#fee2e2",
+                        border: "1px solid #fca5a5",
+                      }}
+                    >
+                      3+ threshold
+                    </span>
+                  ) : null}
+                </div>
                 <div style={{ color: brandPalette.muted }}>
-                  {student.count} Chronicle records · {student.weekLabel}
-                  {student.homegroup ? ` · ${student.homegroup}` : ""}
+                  {student.count}
+                  {isMobile ? "" : " Chronicle records"}
+                  {!isMobile && student.homegroup ? ` · ${student.homegroup}` : ""}
                 </div>
               </div>
             ))
           )}
         </div>
+
+        {isMobile ? null : (
+          <div style={cardStyle}>
+            <h2 style={sectionTitleStyle}>Chronicle Watchlist</h2>
+            <p style={sectionCopyStyle}>
+              Students with the most Chronicle records across the imported data.
+            </p>
+            {topChronicleStudents.length === 0 ? (
+              <p>No Chronicle records loaded yet.</p>
+            ) : (
+              topChronicleStudents.map((student) => (
+                <div
+                  key={`chronicle-${student.name}`}
+                  style={{ ...entryCardStyle, cursor: "pointer" }}
+                  onClick={() => setSelectedStudent(student.name)}
+                >
+                  <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                  <div style={{ color: brandPalette.muted }}>
+                    {student.count} Chronicle records
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
-      <div style={twoColStyle}>
-        <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Attendance Watchlist</h2>
-          <p style={sectionCopyStyle}>
-            Students with the most recorded late arrivals this week.
-          </p>
-          {topAttendanceStudents.length === 0 ? (
-            <p>No attendance records loaded yet.</p>
-          ) : (
-            topAttendanceStudents.map((student) => (
-              <div
-                key={`attendance-${student.name}`}
-                style={{ ...entryCardStyle, cursor: "pointer" }}
-                onClick={() => setSelectedStudent(student.name)}
-              >
-                <div style={{ fontWeight: "bold" }}>{student.name}</div>
-                <div style={{ color: brandPalette.muted }}>
-                  {student.count} late arrivals
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
+      <div style={mobileTwoColStyle}>
         <div style={cardStyle}>
           <h2 style={sectionTitleStyle}>Attendance 2+ This Week</h2>
-          <p style={sectionCopyStyle}>
+          {isMobile ? null : (
+            <p style={sectionCopyStyle}>
             Students with two or more attendance incidents in the current tracked week.
-          </p>
+            </p>
+          )}
           {attendanceTwoPlusThisWeek.length === 0 ? (
             <p>No students have reached two attendance incidents this week yet.</p>
           ) : (
             attendanceTwoPlusThisWeek.map((student) => (
               <div
                 key={student.key}
-                style={{ ...entryCardStyle, cursor: "pointer" }}
+                style={{
+                  ...entryCardStyle,
+                  cursor: "pointer",
+                  border:
+                    student.count >= 3
+                      ? "2px solid #dc2626"
+                      : entryCardStyle.border,
+                  background:
+                    student.count >= 3 ? "#fef2f2" : entryCardStyle.background,
+                }}
                 onClick={() => setSelectedStudent(student.name)}
               >
-                <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    alignItems: "center",
+                  }}
+                >
+                  <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                  {student.count >= 3 ? (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        padding: "6px 10px",
+                        borderRadius: 999,
+                        fontSize: 12,
+                        fontWeight: 800,
+                        color: "#b91c1c",
+                        background: "#fee2e2",
+                        border: "1px solid #fca5a5",
+                      }}
+                    >
+                      3+ threshold
+                    </span>
+                  ) : null}
+                </div>
                 <div style={{ color: brandPalette.muted }}>
-                  {student.count} attendance incidents · {student.weekLabel}
-                  {student.homegroup ? ` · ${student.homegroup}` : ""}
+                  {student.count}
+                  {isMobile ? "" : " attendance incidents"}
+                  {!isMobile && student.homegroup ? ` · ${student.homegroup}` : ""}
                 </div>
               </div>
             ))
           )}
         </div>
+
+        {isMobile ? null : (
+          <div style={cardStyle}>
+            <h2 style={sectionTitleStyle}>Attendance Watchlist</h2>
+            <p style={sectionCopyStyle}>
+              Students with the most recorded late arrivals this year.
+            </p>
+            {topAttendanceStudents.length === 0 ? (
+              <p>No attendance records loaded yet.</p>
+            ) : (
+              topAttendanceStudents.map((student) => (
+                <div
+                  key={`attendance-${student.name}`}
+                  style={{ ...entryCardStyle, cursor: "pointer" }}
+                  onClick={() => setSelectedStudent(student.name)}
+                >
+                  <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                  <div style={{ color: brandPalette.muted }}>
+                    {student.count} late arrivals
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
-      <div style={twoColStyle}>
-        <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Detention Watchlist</h2>
-          <p style={sectionCopyStyle}>
-            Students with the highest number of detention entries.
-          </p>
-          {topDetentionStudents.length === 0 ? (
-            <p>No detention records loaded yet.</p>
-          ) : (
-            topDetentionStudents.map((student) => (
-              <div
-                key={`detention-${student.name}`}
-                style={{ ...entryCardStyle, cursor: "pointer" }}
-                onClick={() => setSelectedStudent(student.name)}
-              >
-                <div style={{ fontWeight: "bold" }}>{student.name}</div>
-                <div style={{ color: brandPalette.muted }}>
-                  {student.count} detention records
+      <div style={mobileTwoColStyle}>
+        {isMobile ? null : (
+          <div style={cardStyle}>
+            <h2 style={sectionTitleStyle}>Detention Watchlist</h2>
+            <p style={sectionCopyStyle}>
+              Students with the highest number of detention entries.
+            </p>
+            {topDetentionStudents.length === 0 ? (
+              <p>No detention records loaded yet.</p>
+            ) : (
+              topDetentionStudents.map((student) => (
+                <div
+                  key={`detention-${student.name}`}
+                  style={{ ...entryCardStyle, cursor: "pointer" }}
+                  onClick={() => setSelectedStudent(student.name)}
+                >
+                  <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                  <div style={{ color: brandPalette.muted }}>
+                    {student.count} detention records
+                  </div>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        )}
 
         <UpcomingSessionAssignmentsCard
           upcomingSession={upcomingSession}
@@ -245,104 +353,106 @@ export default function DashboardHome({
         />
       </div>
 
-      <div style={twoColStyle}>
-        <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>To Do</h2>
-          <p style={sectionCopyStyle}>
-            Keep a short running list of follow-ups for the day.
-          </p>
-          <form
-            onSubmit={addTodo}
-            style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}
-          >
-            <input
-              style={{ ...inputStyle, flex: "1 1 320px", marginBottom: 0 }}
-              placeholder="Add a task"
-              value={todoInput}
-              onChange={(event) => setTodoInput(event.target.value)}
-            />
-            <input
-              style={{ ...inputStyle, flex: "0 0 180px", marginBottom: 0 }}
-              type="date"
-              value={todoDueDate}
-              onChange={(event) => setTodoDueDate(event.target.value)}
-            />
-            <button type="submit" style={buttonStyle}>
-              {creatingTodo ? "Adding..." : "Add task"}
-            </button>
-          </form>
-
-          {generalTodos.length === 0 ? (
-            <p>No tasks yet.</p>
-          ) : (
-            generalTodos.map((todo) => (
-              <TodoRow
-                key={todo.id}
-                todo={todo}
-                updatingTodoId={updatingTodoId}
-                deletingTodoId={deletingTodoId}
-                onToggleTodo={onToggleTodo}
-                onDeleteTodo={onDeleteTodo}
+      {isMobile ? null : (
+        <div style={mobileTwoColStyle}>
+          <div style={cardStyle}>
+            <h2 style={sectionTitleStyle}>To Do</h2>
+            <p style={sectionCopyStyle}>
+              Keep a short running list of follow-ups for the day.
+            </p>
+            <form
+              onSubmit={addTodo}
+              style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}
+            >
+              <input
+                style={{ ...inputStyle, flex: "1 1 320px", marginBottom: 0 }}
+                placeholder="Add a task"
+                value={todoInput}
+                onChange={(event) => setTodoInput(event.target.value)}
               />
-            ))
-          )}
-        </div>
-
-        <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Student Follow Up</h2>
-          <p style={sectionCopyStyle}>
-            Track a student, a short description, and the due date for the follow-up.
-          </p>
-          <form
-            onSubmit={addStudentFollowUp}
-            style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}
-          >
-            <input
-              list="dashboard-student-options"
-              style={{ ...inputStyle, flex: "1 1 260px", marginBottom: 0 }}
-              placeholder="Student name"
-              value={followUpStudent}
-              onChange={(event) => setFollowUpStudent(event.target.value)}
-            />
-            <input
-              style={{ ...inputStyle, flex: "2 1 320px", marginBottom: 0 }}
-              placeholder="Description"
-              value={followUpDescription}
-              onChange={(event) => setFollowUpDescription(event.target.value)}
-            />
-            <input
-              style={{ ...inputStyle, flex: "0 0 180px", marginBottom: 0 }}
-              type="date"
-              value={followUpDueDate}
-              onChange={(event) => setFollowUpDueDate(event.target.value)}
-            />
-            <button type="submit" style={buttonStyle}>
-              {creatingTodo ? "Adding..." : "Add follow-up"}
-            </button>
-          </form>
-          <datalist id="dashboard-student-options">
-            {studentOptions.map((studentName) => (
-              <option key={studentName} value={studentName} />
-            ))}
-          </datalist>
-
-          {studentFollowUps.length === 0 ? (
-            <p>No student follow-ups yet.</p>
-          ) : (
-            studentFollowUps.map((todo) => (
-              <TodoRow
-                key={todo.id}
-                todo={todo}
-                updatingTodoId={updatingTodoId}
-                deletingTodoId={deletingTodoId}
-                onToggleTodo={onToggleTodo}
-                onDeleteTodo={onDeleteTodo}
-                showStudentName
+              <input
+                style={{ ...inputStyle, flex: "0 0 180px", marginBottom: 0 }}
+                type="date"
+                value={todoDueDate}
+                onChange={(event) => setTodoDueDate(event.target.value)}
               />
-            ))
-          )}
+              <button type="submit" style={buttonStyle}>
+                {creatingTodo ? "Adding..." : "Add task"}
+              </button>
+            </form>
+
+            {generalTodos.length === 0 ? (
+              <p>No tasks yet.</p>
+            ) : (
+              generalTodos.map((todo) => (
+                <TodoRow
+                  key={todo.id}
+                  todo={todo}
+                  updatingTodoId={updatingTodoId}
+                  deletingTodoId={deletingTodoId}
+                  onToggleTodo={onToggleTodo}
+                  onDeleteTodo={onDeleteTodo}
+                />
+              ))
+            )}
+          </div>
+
+          <div style={cardStyle}>
+            <h2 style={sectionTitleStyle}>Student Follow Up</h2>
+            <p style={sectionCopyStyle}>
+              Track a student, a short description, and the due date for the follow-up.
+            </p>
+            <form
+              onSubmit={addStudentFollowUp}
+              style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}
+            >
+              <input
+                list="dashboard-student-options"
+                style={{ ...inputStyle, flex: "1 1 260px", marginBottom: 0 }}
+                placeholder="Student name"
+                value={followUpStudent}
+                onChange={(event) => setFollowUpStudent(event.target.value)}
+              />
+              <input
+                style={{ ...inputStyle, flex: "2 1 320px", marginBottom: 0 }}
+                placeholder="Description"
+                value={followUpDescription}
+                onChange={(event) => setFollowUpDescription(event.target.value)}
+              />
+              <input
+                style={{ ...inputStyle, flex: "0 0 180px", marginBottom: 0 }}
+                type="date"
+                value={followUpDueDate}
+                onChange={(event) => setFollowUpDueDate(event.target.value)}
+              />
+              <button type="submit" style={buttonStyle}>
+                {creatingTodo ? "Adding..." : "Add follow-up"}
+              </button>
+            </form>
+            <datalist id="dashboard-student-options">
+              {studentOptions.map((studentName) => (
+                <option key={studentName} value={studentName} />
+              ))}
+            </datalist>
+
+            {studentFollowUps.length === 0 ? (
+              <p>No student follow-ups yet.</p>
+            ) : (
+              studentFollowUps.map((todo) => (
+                <TodoRow
+                  key={todo.id}
+                  todo={todo}
+                  updatingTodoId={updatingTodoId}
+                  deletingTodoId={deletingTodoId}
+                  onToggleTodo={onToggleTodo}
+                  onDeleteTodo={onDeleteTodo}
+                  showStudentName
+                />
+              ))
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }
