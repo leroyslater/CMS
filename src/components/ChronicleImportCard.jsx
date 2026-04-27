@@ -488,7 +488,8 @@ function getVictorianTermWeek(weekEndingDate) {
 
 function getSchoolWeekEndingDate(date) {
   const weekEnding = new Date(date);
-  const daysUntilFriday = (5 - weekEnding.getDay() + 7) % 7;
-  weekEnding.setDate(weekEnding.getDate() + daysUntilFriday);
+  const day = weekEnding.getDay();
+  const daysSinceFriday = (day - 5 + 7) % 7;
+  weekEnding.setDate(weekEnding.getDate() - daysSinceFriday + 7);
   return weekEnding;
 }

@@ -2312,8 +2312,9 @@ function getFridayWeekLabel(date) {
 
 function getSchoolWeekEndingDate(date) {
   const weekEnding = new Date(date);
-  const daysUntilFriday = (5 - weekEnding.getDay() + 7) % 7;
-  weekEnding.setDate(weekEnding.getDate() + daysUntilFriday);
+  const day = weekEnding.getDay();
+  const daysSinceFriday = (day - 5 + 7) % 7;
+  weekEnding.setDate(weekEnding.getDate() - daysSinceFriday + 7);
   return weekEnding;
 }
 
@@ -2435,12 +2436,9 @@ function mapChronicleRecordToView(record, studentLookupByCode = {}) {
       ? formatDisplayDate(occurredDate)
       : record.occurred_timestamp || "",
     occurredDate,
-    weekKey:
-      record.week_key ||
-      (occurredDate ? getFridayWeekKey(occurredDate) : "unknown-week"),
+    weekKey: occurredDate ? getFridayWeekKey(occurredDate) : record.week_key || "unknown-week",
     weekLabel:
-      record.week_label ||
-      (occurredDate ? getFridayWeekLabel(occurredDate) : "Unknown week"),
+      occurredDate ? getFridayWeekLabel(occurredDate) : record.week_label || "Unknown week",
     chronicleType: record.chronicle_type || "",
     details: normalizeChronicleDetails(record.details),
     originalPublisher: record.original_publisher || "",
@@ -2480,11 +2478,9 @@ function mapAttendanceRecordToView(record, studentLookupByCode = {}) {
     teacher: record.teacher || "",
     minutesLate: Number(record.minutes_late || 0),
     startAtDate: startDate,
-    weekKey:
-      record.week_key || (startDate ? getFridayWeekKey(startDate) : "unknown-week"),
+    weekKey: startDate ? getFridayWeekKey(startDate) : record.week_key || "unknown-week",
     weekLabel:
-      record.week_label ||
-      (startDate ? getFridayWeekLabel(startDate) : "Unknown week"),
+      startDate ? getFridayWeekLabel(startDate) : record.week_label || "Unknown week",
   };
 }
 
