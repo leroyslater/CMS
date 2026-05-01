@@ -22,7 +22,7 @@ export default function StudentUploadCard({
     <div style={cardStyle}>
       <h2 style={sectionTitleStyle}>Student Upload</h2>
       <p style={sectionCopyStyle}>
-        Upload a CSV with columns: SUSSI ID, Last Name, First Name, and Form Group.
+        Upload a CSV with columns: SUSSI ID, Last Name, First Name, and Form Group. Optional attendance columns like `Attendance %` or `Attendance Percentage` will also be imported if present.
       </p>
       <input
         key={uploadInputKey}

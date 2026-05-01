@@ -31,7 +31,6 @@ import {
 } from "./styles/uiStyles";
 
 const todayString = new Date().toISOString().slice(0, 10);
-
 export default function App() {
   const {
     authSession,
@@ -86,6 +85,9 @@ export default function App() {
   const [attendanceHomegroupFilter, setAttendanceHomegroupFilter] = useState("");
   const [attendanceOnly3Plus, setAttendanceOnly3Plus] = useState(false);
   const [attendanceSessionId, setAttendanceSessionId] = useState("");
+  const [attendanceSyncing, setAttendanceSyncing] = useState(false);
+  const [attendancePreviewRows, setAttendancePreviewRows] = useState([]);
+  const [attendanceApprovedAbsenceRows, setAttendanceApprovedAbsenceRows] = useState([]);
 
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -564,13 +566,23 @@ export default function App() {
             record[header] = values[index] || "";
           });
           const homegroup = record["form group"] || "";
-          return {
+          const student = {
             student_code: record["sussi id"],
             first_name: record["first name"],
             last_name: record["last name"],
             year_level: extractYearLevelFromHomegroup(homegroup),
             homegroup,
           };
+
+          const attendancePercentage = parseAttendancePercentageValue(
+            getStudentAttendancePercentageValue(record)
+          );
+
+          if (attendancePercentage != null) {
+            student.attendance_percentage = attendancePercentage;
+          }
+
+          return student;
         })
         .filter(
           (student) =>
@@ -597,7 +609,12 @@ export default function App() {
           "student_code"
         );
       } catch (err) {
-        setDataError(err.message || "Failed to upload students.");
+        const message = err.message || "Failed to upload students.";
+        setDataError(
+          message.includes("attendance_percentage")
+            ? "Students table is missing attendance percentage support. Run database/students_attendance_percentage.sql in Supabase first."
+            : message
+        );
         return;
       }
 
@@ -1170,6 +1187,87 @@ export default function App() {
     }
   }
 
+  async function handleAttendanceSync() {
+    clearError();
+    setMessage("");
+
+    const accessToken = authSession?.access_token;
+    if (!accessToken) {
+      setDataError("You need to be signed in before syncing attendance data.");
+      return;
+    }
+
+    setAttendanceSyncing(true);
+    const currentYear = new Date().getFullYear();
+    const defaultFromDate = `${currentYear}-01-01`;
+    const defaultToDate = todayString;
+
+    try {
+      const response = await fetch("/api/compass-attendance-sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          fromDate: defaultFromDate,
+          toDate: defaultToDate,
+          latestKnownStartAt: latestSavedAttendanceStartAt || undefined,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = result?.error || "Failed to sync attendance records from Compass.";
+        setDataError(
+          message.includes("attendance_absence_entries")
+            ? "Attendance absence table missing. Run database/attendance_absence_entries.sql in Supabase first."
+            : message
+        );
+        return;
+      }
+
+      setAttendancePreviewRows([]);
+      const approvedAbsenceRecords = Array.isArray(result?.approvedAbsenceRecords)
+        ? result.approvedAbsenceRecords
+        : [];
+      setAttendanceApprovedAbsenceRows(
+        approvedAbsenceRecords.map((record) =>
+          mapApprovedAbsenceRecordToView(record, studentLookupByCode)
+        )
+      );
+      const parsedRows = await loadAttendanceRows(accessToken);
+      const syncedCount = Number(result?.syncedCount || 0);
+      const insertedCount = Number(result?.insertedCount || 0);
+      const updatedCount = Number(result?.updatedCount || 0);
+      const schoolLateCount = Number(result?.schoolLateCount || 0);
+      const classLateCount = Number(result?.classLateCount || 0);
+      const approvedAbsenceCount = approvedAbsenceRecords.length;
+      const duplicateCount = Number(result?.duplicateCount || 0);
+      const unmatchedStudentCodes = Array.isArray(result?.missingStudentCodes)
+        ? result.missingStudentCodes
+        : [];
+      const duplicateMessage =
+        duplicateCount > 0
+          ? ` Collapsed ${duplicateCount} duplicate Compass attendance row${duplicateCount === 1 ? "" : "s"}.`
+          : "";
+      const unmatchedMessage =
+        unmatchedStudentCodes.length > 0
+          ? ` Skipped ${unmatchedStudentCodes.length} missing student code${unmatchedStudentCodes.length === 1 ? "" : "s"}: ${unmatchedStudentCodes.join(", ")}.`
+          : "";
+      setSelectedAttendanceKeys([]);
+      setSelectedAttendanceKey("");
+      setMessage(
+        `Attendance sync complete: ${insertedCount} new, ${updatedCount} updated, ${syncedCount} synced, ${parsedRows.length} total loaded. ${schoolLateCount} school late, ${classLateCount} class late, ${approvedAbsenceCount} unapproved full-day absence${approvedAbsenceCount === 1 ? "" : "s"}.${duplicateMessage}${unmatchedMessage}`
+      );
+    } catch (err) {
+      setDataError(err.message || "Failed to sync attendance records from Compass.");
+    } finally {
+      setAttendanceSyncing(false);
+    }
+  }
+
   const chronicleGrouped = useMemo(() => {
     const map = {};
 
@@ -1226,6 +1324,60 @@ export default function App() {
       (a, b) => b.count - a.count || a.name.localeCompare(b.name)
     );
   }, [attendanceRows]);
+  const attendancePreviewMode = attendancePreviewRows.length > 0;
+  const attendancePreviewDisplayRows = useMemo(
+    () =>
+      attendancePreviewRows.filter((row) => {
+        if (!isTrackedAttendancePeriod(row.period)) {
+          return false;
+        }
+
+        if (isParentApprovedAttendanceStatus(row.statusName, row.statusCode)) {
+          return false;
+        }
+
+        if (row.attendanceType === "School late") {
+          return true;
+        }
+
+        if (row.attendanceType === "Class late" && !row.absentDayPattern) {
+          return true;
+        }
+
+        return false;
+      }),
+    [attendancePreviewRows]
+  );
+  const attendancePageRows = attendancePreviewMode
+    ? attendancePreviewDisplayRows
+    : attendanceRows;
+  const attendancePageGrouped = useMemo(() => {
+    const map = {};
+
+    attendancePageRows.forEach((row) => {
+      const key = `${row.studentCode}__${row.weekKey}`;
+      if (!map[key]) {
+        map[key] = {
+          key,
+          name: row.studentName,
+          studentName: row.studentName,
+          studentCode: row.studentCode,
+          count: 0,
+          rows: [],
+          yearLevel: row.yearLevel,
+          homegroup: row.homegroup,
+          weekKey: row.weekKey,
+          weekLabel: row.weekLabel,
+        };
+      }
+      map[key].count += 1;
+      map[key].rows.push(row);
+    });
+
+    return Object.values(map).sort(
+      (a, b) => b.count - a.count || a.name.localeCompare(b.name)
+    );
+  }, [attendancePageRows]);
 
   const filteredChronicle = useMemo(() => {
     return chronicleGrouped.filter((g) => {
@@ -1253,7 +1405,7 @@ export default function App() {
   ]);
 
   const filteredAttendance = useMemo(() => {
-    return attendanceGrouped.filter((group) => {
+    return attendancePageGrouped.filter((group) => {
       if (attendanceOnly3Plus && group.count < 3) return false;
       if (
         attendanceSearch &&
@@ -1273,8 +1425,38 @@ export default function App() {
       return true;
     });
   }, [
-    attendanceGrouped,
+    attendancePageGrouped,
     attendanceOnly3Plus,
+    attendanceSearch,
+    attendanceYearFilter,
+    attendanceHomegroupFilter,
+  ]);
+
+  const filteredAttendanceApprovedAbsences = useMemo(() => {
+    return attendanceApprovedAbsenceRows.filter((row) => {
+      const searchText = attendanceSearch.toLowerCase();
+
+      if (
+        attendanceSearch &&
+        !`${row.studentName} ${row.studentCode} ${row.statusName}`
+          .toLowerCase()
+          .includes(searchText)
+      ) {
+        return false;
+      }
+      if (attendanceYearFilter && row.yearLevel !== attendanceYearFilter) {
+        return false;
+      }
+      if (
+        attendanceHomegroupFilter &&
+        row.homegroup !== attendanceHomegroupFilter
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [
+    attendanceApprovedAbsenceRows,
     attendanceSearch,
     attendanceYearFilter,
     attendanceHomegroupFilter,
@@ -1291,9 +1473,9 @@ export default function App() {
   const attendanceYearOptions = useMemo(
     () =>
       Array.from(
-        new Set(attendanceGrouped.map((group) => group.yearLevel).filter(Boolean))
+        new Set(attendancePageGrouped.map((group) => group.yearLevel).filter(Boolean))
       ).sort(),
-    [attendanceGrouped]
+    [attendancePageGrouped]
   );
 
   const chronicleHomegroupOptions = useMemo(
@@ -1307,9 +1489,9 @@ export default function App() {
   const attendanceHomegroupOptions = useMemo(
     () =>
       Array.from(
-        new Set(attendanceGrouped.map((group) => group.homegroup).filter(Boolean))
+        new Set(attendancePageGrouped.map((group) => group.homegroup).filter(Boolean))
       ).sort(),
-    [attendanceGrouped]
+    [attendancePageGrouped]
   );
 
   const selectedChronicleGroup = useMemo(
@@ -1318,8 +1500,8 @@ export default function App() {
   );
 
   const selectedAttendanceGroup = useMemo(
-    () => attendanceGrouped.find((group) => group.key === selectedAttendanceKey) || null,
-    [attendanceGrouped, selectedAttendanceKey]
+    () => attendancePageGrouped.find((group) => group.key === selectedAttendanceKey) || null,
+    [attendancePageGrouped, selectedAttendanceKey]
   );
 
   const selectedSession = useMemo(
@@ -1407,6 +1589,17 @@ export default function App() {
     return attendanceRows.filter((row) => dashboardStudentCodes.has(row.studentCode));
   }, [attendanceRows, dashboardStudentCodes, shouldScopeDashboardByYear]);
 
+  const dashboardAttendanceApprovedAbsenceRows = useMemo(() => {
+    if (!shouldScopeDashboardByYear) return attendanceApprovedAbsenceRows;
+    return attendanceApprovedAbsenceRows.filter((row) =>
+      dashboardStudentCodes.has(row.studentCode)
+    );
+  }, [
+    attendanceApprovedAbsenceRows,
+    dashboardStudentCodes,
+    shouldScopeDashboardByYear,
+  ]);
+
   const dashboardChronicleGrouped = useMemo(() => {
     if (!shouldScopeDashboardByYear) return chronicleGrouped;
     return chronicleGrouped.filter((group) => dashboardStudentCodes.has(group.studentCode));
@@ -1416,6 +1609,23 @@ export default function App() {
     if (!shouldScopeDashboardByYear) return attendanceGrouped;
     return attendanceGrouped.filter((group) => dashboardStudentCodes.has(group.studentCode));
   }, [attendanceGrouped, dashboardStudentCodes, shouldScopeDashboardByYear]);
+
+  const latestSavedAttendanceStartAt = useMemo(() => {
+    const allDates = [
+      ...attendanceRows.map((row) => row.startAtDate).filter(Boolean),
+      ...attendanceApprovedAbsenceRows.map((row) => row.startAtDate).filter(Boolean),
+    ];
+
+    if (allDates.length === 0) {
+      return "";
+    }
+
+    const latestDate = allDates.reduce((latest, current) =>
+      current > latest ? current : latest
+    );
+
+    return latestDate.toISOString();
+  }, [attendanceApprovedAbsenceRows, attendanceRows]);
 
   async function loadChronicleRows(accessToken = authSession?.access_token) {
     if (!accessToken) {
@@ -1498,16 +1708,43 @@ export default function App() {
 
   const loadAttendanceRowsEvent = useEffectEvent(loadAttendanceRows);
 
+  async function loadAttendanceAbsenceRows(accessToken = authSession?.access_token) {
+    if (!accessToken) {
+      setAttendanceApprovedAbsenceRows([]);
+      return [];
+    }
+
+    try {
+      const absenceData = await fetchTableRows("attendance_absence_entries", accessToken, {
+        column: "start_at",
+        ascending: false,
+      });
+
+      const parsedRows = (absenceData || []).map((record) =>
+        mapApprovedAbsenceRecordToView(record, studentLookupByCode)
+      );
+      setAttendanceApprovedAbsenceRows(parsedRows);
+      return parsedRows;
+    } catch (err) {
+      setDataError(err.message || "Failed to load attendance absences.");
+      return [];
+    }
+  }
+
+  const loadAttendanceAbsenceRowsEvent = useEffectEvent(loadAttendanceAbsenceRows);
+
   useEffect(() => {
     if (!authSession?.access_token) {
       setChronicleRows([]);
       setAttendanceRows([]);
+      setAttendanceApprovedAbsenceRows([]);
       setTodos([]);
       return;
     }
 
     loadChronicleRowsEvent(authSession.access_token);
     loadAttendanceRowsEvent(authSession.access_token);
+    loadAttendanceAbsenceRowsEvent(authSession.access_token);
     loadTodosEvent();
   }, [authSession?.access_token, studentLookupByCode]);
 
@@ -1812,9 +2049,31 @@ export default function App() {
       .slice(0, 5);
   }, [dashboardChronicleRows]);
 
+  const minorBehaviourTeachers = useMemo(() => {
+    const counts = {};
+
+    dashboardChronicleRows.forEach((row) => {
+      if (String(row.chronicleType || "").trim().toLowerCase() !== "minor behaviour") {
+        return;
+      }
+
+      const teacherName = String(row.originalPublisher || "").trim();
+      if (!teacherName) return;
+
+      counts[teacherName] = (counts[teacherName] || 0) + 1;
+    });
+
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+      .slice(0, 8);
+  }, [dashboardChronicleRows]);
+
   const chronicleTwoPlusThisWeek = useMemo(
     () => {
-      const currentWeekEndingKey = getSchoolWeekEndingKey(new Date());
+      const currentWeekEndingKey = getSchoolWeekEndingKey(
+        getDashboardWeekReferenceDate(new Date())
+      );
 
       return dashboardChronicleGrouped
         .filter((group) =>
@@ -1829,6 +2088,7 @@ export default function App() {
           count: group.count,
           weekLabel: group.weekLabel,
           homegroup: group.homegroup,
+          rows: group.rows,
         }));
     },
     [dashboardChronicleGrouped]
@@ -1866,8 +2126,64 @@ export default function App() {
       .slice(0, 5);
   }, [dashboardAttendanceRows]);
 
+  const lowAttendanceStudents = useMemo(() => {
+    const schoolDaysElapsed = countVictorianSchoolDaysElapsedThisYear(new Date());
+    if (schoolDaysElapsed <= 0) return [];
+
+    const absentDatesByStudent = dashboardAttendanceApprovedAbsenceRows.reduce(
+      (map, row) => {
+        const studentCode = String(row.studentCode || "").trim();
+        const startDate = row.startAtDate;
+
+        if (!studentCode || !startDate) return map;
+
+        const dayKey = formatDate(startDate);
+        if (!map[studentCode]) {
+          map[studentCode] = new Set();
+        }
+        map[studentCode].add(dayKey);
+        return map;
+      },
+      {}
+    );
+
+    return dashboardStudents
+      .map((student) => {
+        const studentCode = String(student.student_code || "").trim();
+        const absentDayCount = absentDatesByStudent[studentCode]?.size || 0;
+
+        if (absentDayCount === 0) {
+          return null;
+        }
+
+        const percentage = Number(
+          (((schoolDaysElapsed - absentDayCount) / schoolDaysElapsed) * 100).toFixed(1)
+        );
+
+        return {
+          name: `${student.first_name} ${student.last_name}`.trim(),
+          studentCode: studentCode || "",
+          percentage,
+          absentDayCount,
+          schoolDaysElapsed,
+          homegroup: student.homegroup || "",
+          yearLevel: String(student.year_level || ""),
+        };
+      })
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          a.percentage - b.percentage ||
+          b.absentDayCount - a.absentDayCount ||
+          a.name.localeCompare(b.name)
+      )
+      .slice(0, 8);
+  }, [dashboardAttendanceApprovedAbsenceRows, dashboardStudents]);
+
   const attendanceTwoPlusThisWeek = useMemo(() => {
-    const currentWeekEndingKey = getSchoolWeekEndingKey(new Date());
+    const currentWeekEndingKey = getSchoolWeekEndingKey(
+      getDashboardWeekReferenceDate(new Date())
+    );
 
     return dashboardAttendanceGrouped
       .filter((group) =>
@@ -1882,6 +2198,7 @@ export default function App() {
         count: group.count,
         weekLabel: group.weekLabel,
         homegroup: group.homegroup,
+        rows: group.rows,
       }));
   }, [dashboardAttendanceGrouped]);
 
@@ -1986,9 +2303,11 @@ export default function App() {
               }
               onClearYearLevels={() => setDashboardYearFilter([])}
               topChronicleStudents={topChronicleStudents}
+              minorBehaviourTeachers={minorBehaviourTeachers}
               chronicleTwoPlusThisWeek={chronicleTwoPlusThisWeek}
               topAttendanceStudents={topAttendanceStudents}
               attendanceTwoPlusThisWeek={attendanceTwoPlusThisWeek}
+              lowAttendanceStudents={lowAttendanceStudents}
               topDetentionStudents={topDetentionStudents}
               upcomingSession={upcomingSession}
               upcomingSessionAssignments={upcomingSessionAssignments}
@@ -2118,7 +2437,10 @@ export default function App() {
 
           {activePage === "attendance" ? (
             <AttendanceImportCard
+              handleAttendanceSync={handleAttendanceSync}
               handleAttendanceUpload={handleAttendanceUpload}
+              attendanceSyncing={attendanceSyncing}
+              attendancePreviewMode={attendancePreviewMode}
               attendanceSearch={attendanceSearch}
               setAttendanceSearch={setAttendanceSearch}
               attendanceYearFilter={attendanceYearFilter}
@@ -2134,6 +2456,7 @@ export default function App() {
               attendanceHomegroupOptions={attendanceHomegroupOptions}
               assignSelectedAttendanceGroups={assignSelectedAttendanceGroups}
               filteredAttendance={filteredAttendance}
+              filteredAttendanceApprovedAbsences={filteredAttendanceApprovedAbsences}
               selectedAttendanceKeys={selectedAttendanceKeys}
               toggleAttendanceSelection={toggleAttendanceSelection}
               setSelectedAttendanceKey={setSelectedAttendanceKey}
@@ -2290,6 +2613,83 @@ function normalizeYearLevels(value) {
   return [String(value).trim()].filter(Boolean);
 }
 
+function getStudentAttendancePercentageValue(record) {
+  return (
+    record["attendance percentage"] ||
+    record["attendance %"] ||
+    record["attendance percent"] ||
+    record["attendance"] ||
+    ""
+  );
+}
+
+function parseAttendancePercentageValue(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+
+  const normalized = text.replace(/%/g, "").trim();
+  const parsed = Number.parseFloat(normalized);
+
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return Math.max(0, Math.min(100, Number(parsed.toFixed(1))));
+}
+
+const VICTORIAN_TERM_RANGES_2026 = [
+  { start: "2026-01-28", end: "2026-04-02" },
+  { start: "2026-04-20", end: "2026-06-26" },
+  { start: "2026-07-13", end: "2026-09-18" },
+  { start: "2026-10-05", end: "2026-12-18" },
+];
+
+function parseIsoDateOnly(value) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function countWeekdaysInclusive(startDate, endDate) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+
+  if (start > end) return 0;
+
+  let count = 0;
+  const cursor = new Date(start);
+
+  while (cursor <= end) {
+    const day = cursor.getDay();
+    if (day !== 0 && day !== 6) {
+      count += 1;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return count;
+}
+
+function countVictorianSchoolDaysElapsedThisYear(referenceDate = new Date()) {
+  if (referenceDate.getFullYear() !== 2026) {
+    return 0;
+  }
+
+  return VICTORIAN_TERM_RANGES_2026.reduce((total, term) => {
+    const termStart = parseIsoDateOnly(term.start);
+    const termEnd = parseIsoDateOnly(term.end);
+    const effectiveEnd = referenceDate < termEnd ? referenceDate : termEnd;
+
+    if (!termStart || !termEnd || effectiveEnd < termStart) {
+      return total;
+    }
+
+    return total + countWeekdaysInclusive(termStart, effectiveEnd);
+  }, 0);
+}
+
 function getFridayWeekKey(date) {
   const d = new Date(date);
   const day = d.getDay();
@@ -2320,6 +2720,17 @@ function getSchoolWeekEndingDate(date) {
 
 function getSchoolWeekEndingKey(date) {
   return formatDate(getSchoolWeekEndingDate(date));
+}
+
+function getDashboardWeekReferenceDate(date) {
+  const referenceDate = new Date(date);
+  referenceDate.setHours(0, 0, 0, 0);
+
+  if (referenceDate.getDay() === 5) {
+    referenceDate.setDate(referenceDate.getDate() - 1);
+  }
+
+  return referenceDate;
 }
 
 function isGroupInCurrentSchoolWeek(rows, dateField, currentWeekEndingKey) {
@@ -2453,10 +2864,7 @@ function mapAttendanceRecordToView(record, studentLookupByCode = {}) {
   const studentName = student
     ? `${student.first_name} ${student.last_name}`
     : "Unknown Student";
-  const attendanceType =
-    record.arrival_at || (record.arrival_time_text && record.arrival_time_text !== "-")
-      ? "School late"
-      : "Class late";
+  const attendanceType = classifyAttendanceType(record);
 
   return {
     key: record.id,
@@ -2472,9 +2880,15 @@ function mapAttendanceRecordToView(record, studentLookupByCode = {}) {
         : record.arrival_time_text || "",
     period: record.period || "",
     activityName: record.activity_name || "",
+    sourceType: record.source_type || "",
+    statusName: record.status_name || "",
+    statusCode: record.status_code || "",
+    absentDayPattern: Boolean(record.absent_day_pattern),
+    statusDescription: record.status_description || "",
     attendanceType,
     attendanceDescription:
-      attendanceType === "School late" ? "Late to school" : "Late to class",
+      record.status_description ||
+      (attendanceType === "School late" ? "Late to school" : "Late to class"),
     teacher: record.teacher || "",
     minutesLate: Number(record.minutes_late || 0),
     startAtDate: startDate,
@@ -2482,6 +2896,89 @@ function mapAttendanceRecordToView(record, studentLookupByCode = {}) {
     weekLabel:
       startDate ? getFridayWeekLabel(startDate) : record.week_label || "Unknown week",
   };
+}
+
+function mapApprovedAbsenceRecordToView(record, studentLookupByCode = {}) {
+  const startDate = record.start_at
+    ? new Date(record.start_at)
+    : parseAttendanceDateTime(record.start_time_text);
+  const student = studentLookupByCode[record.student_code] || null;
+  const studentName = student
+    ? `${student.first_name} ${student.last_name}`
+    : "Unknown Student";
+
+  return {
+    key: record.id,
+    id: record.id,
+    studentCode: record.student_code || "",
+    studentName,
+    yearLevel: String(student?.year_level || ""),
+    homegroup: student?.homegroup || "",
+    startText: startDate ? formatDisplayDate(startDate) : record.start_time_text || "",
+    startAtDate: startDate,
+    periodsText: record.periods || "",
+    statusName: record.status_name || "",
+    statusCode: record.status_code || "",
+    statusDescription: record.status_description || "",
+    weekKey: startDate ? getFridayWeekKey(startDate) : record.week_key || "unknown-week",
+    weekLabel:
+      startDate ? getFridayWeekLabel(startDate) : record.week_label || "Unknown week",
+  };
+}
+
+function classifyAttendanceType(record) {
+  const sourceType = String(record?.source_type || "").trim().toLowerCase();
+  const statusName = String(record?.status_name || "").trim().toLowerCase();
+  const statusCode = String(record?.status_code || "").trim().toUpperCase();
+  const period = String(record?.period || "").trim().toUpperCase();
+  const hasArrival =
+    Boolean(record?.arrival_at) ||
+    (String(record?.arrival_time_text || "").trim() !== "" &&
+      String(record?.arrival_time_text || "").trim() !== "-");
+
+  if (
+    period === "S1" &&
+    (!statusName ||
+      statusCode === "L" ||
+      statusCode === "LU" ||
+      statusCode === "LA" ||
+      statusName.includes("late"))
+  ) {
+    return "School late";
+  }
+
+  if (statusName === "late to class" || statusCode === "L") {
+    return "Class late";
+  }
+
+  if (
+    sourceType === "period" &&
+    !hasArrival &&
+    (statusCode === "LU" || statusCode === "LA" || statusName.includes("late arrival at school"))
+  ) {
+    return "Class late";
+  }
+
+  if (hasArrival || statusCode === "LU" || statusCode === "LA") {
+    return "School late";
+  }
+
+  return statusName || "Class late";
+}
+
+function isTrackedAttendancePeriod(period) {
+  const normalizedPeriod = String(period || "").trim().toUpperCase();
+  return normalizedPeriod === "S1" ||
+    normalizedPeriod === "S2" ||
+    normalizedPeriod === "S3" ||
+    normalizedPeriod === "S4";
+}
+
+function isParentApprovedAttendanceStatus(statusName, statusCode) {
+  const normalizedStatusName = String(statusName || "").trim().toLowerCase();
+  const normalizedStatusCode = String(statusCode || "").trim().toUpperCase();
+
+  return normalizedStatusCode === "LA" || normalizedStatusName.includes("parent approved");
 }
 
 function getChronicleValue(row, ...keys) {

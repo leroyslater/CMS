@@ -25,9 +25,11 @@ export default function DashboardHome({
   onToggleYearLevel,
   onClearYearLevels,
   topChronicleStudents,
+  minorBehaviourTeachers,
   chronicleTwoPlusThisWeek,
   topAttendanceStudents,
   attendanceTwoPlusThisWeek,
+  lowAttendanceStudents,
   topDetentionStudents,
   upcomingSession,
   upcomingSessionAssignments,
@@ -49,6 +51,8 @@ export default function DashboardHome({
   const [followUpStudent, setFollowUpStudent] = useState("");
   const [followUpDescription, setFollowUpDescription] = useState("");
   const [followUpDueDate, setFollowUpDueDate] = useState("");
+  const [expandedChronicleKey, setExpandedChronicleKey] = useState("");
+  const [expandedAttendanceKey, setExpandedAttendanceKey] = useState("");
 
   const generalTodos = todos.filter((todo) => !todo.studentName);
   const studentFollowUps = todos.filter((todo) => todo.studentName);
@@ -92,6 +96,16 @@ export default function DashboardHome({
       setFollowUpDescription("");
       setFollowUpDueDate("");
     }
+  }
+
+  function toggleDashboardChronicleStudent(student) {
+    setSelectedStudent(student.name);
+    setExpandedChronicleKey((current) => (current === student.key ? "" : student.key));
+  }
+
+  function toggleDashboardAttendanceStudent(student) {
+    setSelectedStudent(student.name);
+    setExpandedAttendanceKey((current) => (current === student.key ? "" : student.key));
   }
 
   return (
@@ -166,7 +180,7 @@ export default function DashboardHome({
                   background:
                     student.count >= 3 ? "#fef2f2" : entryCardStyle.background,
                 }}
-                onClick={() => setSelectedStudent(student.name)}
+                onClick={() => toggleDashboardChronicleStudent(student)}
               >
                 <div
                   style={{
@@ -200,47 +214,44 @@ export default function DashboardHome({
                   {isMobile ? "" : " Chronicle records"}
                   {!isMobile && student.homegroup ? ` · ${student.homegroup}` : ""}
                 </div>
+                {expandedChronicleKey === student.key ? (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ fontWeight: "bold", marginBottom: 8 }}>
+                      Chronicle Incident Detail
+                    </div>
+                    {student.rows.map((row, index) => (
+                      <div
+                        key={`${student.key}-${index}`}
+                        style={{ ...entryCardStyle, marginTop: 8 }}
+                      >
+                        <div style={{ fontWeight: "bold" }}>{row.occurredText}</div>
+                        <div>
+                          <strong>Details:</strong> {row.details || "No details"}
+                        </div>
+                        <div>
+                          <strong>Chronicle Type:</strong> {row.chronicleType || "Unknown"}
+                        </div>
+                        <div>
+                          <strong>Original Publisher:</strong> {row.originalPublisher || "-"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ))
           )}
         </div>
 
-        {isMobile ? null : (
-          <div style={cardStyle}>
-            <h2 style={sectionTitleStyle}>Chronicle Watchlist</h2>
-            <p style={sectionCopyStyle}>
-              Students with the most Chronicle records across the imported data.
-            </p>
-            {topChronicleStudents.length === 0 ? (
-              <p>No Chronicle records loaded yet.</p>
-            ) : (
-              topChronicleStudents.map((student) => (
-                <div
-                  key={`chronicle-${student.name}`}
-                  style={{ ...entryCardStyle, cursor: "pointer" }}
-                  onClick={() => setSelectedStudent(student.name)}
-                >
-                  <div style={{ fontWeight: "bold" }}>{student.name}</div>
-                  <div style={{ color: brandPalette.muted }}>
-                    {student.count} Chronicle records
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-      </div>
-
-      <div style={mobileTwoColStyle}>
         <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Attendance 2+ This Week</h2>
+          <h2 style={sectionTitleStyle}>Late 2+ This Week</h2>
           {isMobile ? null : (
             <p style={sectionCopyStyle}>
-            Students with two or more attendance incidents in the current tracked week.
+            Students with two or more late incidents in the current tracked week.
             </p>
           )}
           {attendanceTwoPlusThisWeek.length === 0 ? (
-            <p>No students have reached two attendance incidents this week yet.</p>
+            <p>No students have reached two late incidents this week yet.</p>
           ) : (
             attendanceTwoPlusThisWeek.map((student) => (
               <div
@@ -255,7 +266,7 @@ export default function DashboardHome({
                   background:
                     student.count >= 3 ? "#fef2f2" : entryCardStyle.background,
                 }}
-                onClick={() => setSelectedStudent(student.name)}
+                onClick={() => toggleDashboardAttendanceStudent(student)}
               >
                 <div
                   style={{
@@ -286,17 +297,113 @@ export default function DashboardHome({
                 </div>
                 <div style={{ color: brandPalette.muted }}>
                   {student.count}
-                  {isMobile ? "" : " attendance incidents"}
+                  {isMobile ? "" : " late incidents"}
                   {!isMobile && student.homegroup ? ` · ${student.homegroup}` : ""}
                 </div>
+                {expandedAttendanceKey === student.key ? (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ fontWeight: "bold", marginBottom: 8 }}>
+                      Attendance Incident Detail
+                    </div>
+                    {student.rows.map((row, index) => (
+                      <div
+                        key={`${student.key}-${index}`}
+                        style={{ ...entryCardStyle, marginTop: 8 }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: 12,
+                            alignItems: "center",
+                            marginBottom: 8,
+                          }}
+                        >
+                          <div style={{ fontWeight: "bold" }}>
+                            {row.startText} · {row.period || "No period"}
+                          </div>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "6px 10px",
+                              borderRadius: 999,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color:
+                                row.attendanceType === "School late"
+                                  ? brandPalette.navy
+                                  : "#8a341f",
+                              background:
+                                row.attendanceType === "School late"
+                                  ? brandPalette.mintSoft
+                                  : "#fff2eb",
+                              border:
+                                row.attendanceType === "School late"
+                                  ? "1px solid rgba(92,231,170,0.45)"
+                                  : "1px solid #f1c7b1",
+                            }}
+                          >
+                            {row.attendanceType}
+                          </span>
+                        </div>
+                        <div>
+                          <strong>Class:</strong> {row.activityName || "-"}
+                        </div>
+                        <div>
+                          <strong>Arrival:</strong>{" "}
+                          {row.attendanceType === "Class late"
+                            ? "Not recorded"
+                            : row.arrivalText || "-"}
+                        </div>
+                        <div>
+                          <strong>Minutes late:</strong> {row.minutesLate}
+                        </div>
+                        <div>
+                          <strong>Type:</strong> {row.attendanceDescription || "-"}
+                        </div>
+                        <div>
+                          <strong>Teacher:</strong> {row.teacher || "-"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ))
           )}
         </div>
+      </div>
+
+      <div style={mobileTwoColStyle}>
+        {isMobile ? null : (
+          <div style={cardStyle}>
+            <h2 style={sectionTitleStyle}>Chronicle Watchlist</h2>
+            <p style={sectionCopyStyle}>
+              Students with the most Chronicle records across the imported data.
+            </p>
+            {topChronicleStudents.length === 0 ? (
+              <p>No Chronicle records loaded yet.</p>
+            ) : (
+              topChronicleStudents.map((student) => (
+                <div
+                  key={`chronicle-${student.name}`}
+                  style={{ ...entryCardStyle, cursor: "pointer" }}
+                  onClick={() => setSelectedStudent(student.name)}
+                >
+                  <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                  <div style={{ color: brandPalette.muted }}>
+                    {student.count} Chronicle records
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
 
         {isMobile ? null : (
           <div style={cardStyle}>
-            <h2 style={sectionTitleStyle}>Attendance Watchlist</h2>
+            <h2 style={sectionTitleStyle}>Late Watchlist</h2>
             <p style={sectionCopyStyle}>
               Students with the most recorded late arrivals this year.
             </p>
@@ -321,6 +428,120 @@ export default function DashboardHome({
       </div>
 
       <div style={mobileTwoColStyle}>
+        <div style={cardStyle}>
+          <h2 style={sectionTitleStyle}>Attendance Percentage Watchlist</h2>
+          {isMobile ? null : (
+            <p style={sectionCopyStyle}>
+              Students ordered by lowest year-to-date attendance percentage, based on full-day `Unexplained / NU` absences synced from Compass.
+            </p>
+          )}
+          {lowAttendanceStudents.length === 0 ? (
+            <p>No students with synced full-day `Unexplained / NU` absences are loaded yet.</p>
+          ) : (
+            lowAttendanceStudents.map((student) => (
+              <div
+                key={`low-attendance-${student.studentCode || student.name}`}
+                style={{
+                  ...entryCardStyle,
+                  cursor: "pointer",
+                  border:
+                    student.percentage < 80
+                      ? "2px solid #dc2626"
+                      : student.percentage < 85
+                        ? "2px solid #f59e0b"
+                        : entryCardStyle.border,
+                  background:
+                    student.percentage < 80
+                      ? "#fef2f2"
+                      : student.percentage < 85
+                        ? "#fff7ed"
+                        : entryCardStyle.background,
+                }}
+                onClick={() => setSelectedStudent(student.name)}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    alignItems: "center",
+                  }}
+                >
+                  <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "6px 10px",
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color:
+                        student.percentage < 80
+                          ? "#b91c1c"
+                          : student.percentage < 85
+                            ? "#9a3412"
+                            : brandPalette.navy,
+                      background:
+                        student.percentage < 80
+                          ? "#fee2e2"
+                          : student.percentage < 85
+                            ? "#ffedd5"
+                            : brandPalette.mintSoft,
+                      border:
+                        student.percentage < 80
+                          ? "1px solid #fca5a5"
+                          : student.percentage < 85
+                            ? "1px solid #fdba74"
+                            : "1px solid rgba(92,231,170,0.45)",
+                    }}
+                  >
+                    {student.percentage.toFixed(1)}%
+                  </span>
+                </div>
+                <div style={{ color: brandPalette.muted }}>
+                  {student.absentDayCount} unexplained full-day absence
+                  {student.absentDayCount === 1 ? "" : "s"}
+                  {!isMobile && student.homegroup ? ` · ${student.homegroup}` : ""}
+                  {!isMobile ? ` · Year ${student.yearLevel}` : ""}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <UpcomingSessionAssignmentsCard
+          upcomingSession={upcomingSession}
+          assignedStudents={upcomingSessionAssignments}
+          setSelectedStudent={setSelectedStudent}
+        />
+      </div>
+
+      <div style={mobileTwoColStyle}>
+        {isMobile ? null : (
+          <div style={cardStyle}>
+            <h2 style={sectionTitleStyle}>Minor Behaviour Teachers</h2>
+            <p style={sectionCopyStyle}>
+              Teachers issuing the most `Minor Behaviour` Chronicle records.
+            </p>
+            {minorBehaviourTeachers.length === 0 ? (
+              <p>No minor behaviour Chronicle records loaded yet.</p>
+            ) : (
+              minorBehaviourTeachers.map((teacher) => (
+                <div
+                  key={`minor-behaviour-teacher-${teacher.name}`}
+                  style={entryCardStyle}
+                >
+                  <div style={{ fontWeight: "bold" }}>{teacher.name}</div>
+                  <div style={{ color: brandPalette.muted }}>
+                    {teacher.count} minor behaviour chronicles
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
         {isMobile ? null : (
           <div style={cardStyle}>
             <h2 style={sectionTitleStyle}>Detention Watchlist</h2>
@@ -345,12 +566,6 @@ export default function DashboardHome({
             )}
           </div>
         )}
-
-        <UpcomingSessionAssignmentsCard
-          upcomingSession={upcomingSession}
-          assignedStudents={upcomingSessionAssignments}
-          setSelectedStudent={setSelectedStudent}
-        />
       </div>
 
       {isMobile ? null : (

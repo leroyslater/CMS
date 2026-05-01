@@ -15,7 +15,10 @@ import {
 } from "../styles/uiStyles";
 
 export default function AttendanceImportCard({
+  handleAttendanceSync,
   handleAttendanceUpload,
+  attendanceSyncing,
+  attendancePreviewMode,
   attendanceSearch,
   setAttendanceSearch,
   attendanceYearFilter,
@@ -31,6 +34,7 @@ export default function AttendanceImportCard({
   attendanceHomegroupOptions,
   assignSelectedAttendanceGroups,
   filteredAttendance,
+  filteredAttendanceApprovedAbsences,
   selectedAttendanceKeys,
   toggleAttendanceSelection,
   setSelectedAttendanceKey,
@@ -80,6 +84,7 @@ export default function AttendanceImportCard({
     [filteredAttendance]
   );
   const [expandedWeeks, setExpandedWeeks] = useState({});
+  const [expandedAbsenceWeeks, setExpandedAbsenceWeeks] = useState({});
   const [uploadInputKey, setUploadInputKey] = useState(0);
   const summary = useMemo(() => {
     const groupCount = filteredAttendance.length;
@@ -109,8 +114,39 @@ export default function AttendanceImportCard({
       classLateCount,
     };
   }, [filteredAttendance]);
+  const approvedAbsenceWeeks = useMemo(
+    () =>
+      filteredAttendanceApprovedAbsences
+        .reduce((sections, row) => {
+          const existingSection = sections.find(
+            (section) => section.weekKey === row.weekKey
+          );
+
+          if (existingSection) {
+            existingSection.rows.push(row);
+            return sections;
+          }
+
+          sections.push({
+            weekKey: row.weekKey,
+            weekLabel: row.weekLabel,
+            rows: [row],
+          });
+
+          return sections;
+        }, [])
+        .sort((a, b) => b.weekKey.localeCompare(a.weekKey)),
+    [filteredAttendanceApprovedAbsences]
+  );
   function toggleWeek(weekKey) {
     setExpandedWeeks((prev) => ({
+      ...prev,
+      [weekKey]: !prev[weekKey],
+    }));
+  }
+
+  function toggleAbsenceWeek(weekKey) {
+    setExpandedAbsenceWeeks((prev) => ({
       ...prev,
       [weekKey]: !prev[weekKey],
     }));
@@ -123,6 +159,112 @@ export default function AttendanceImportCard({
 
   return (
     <>
+      <div style={cardStyle}>
+        <h2 style={sectionTitleStyle}>Attendance Compass Sync</h2>
+        <p style={sectionCopyStyle}>
+          Sync school-late and class-late attendance directly from Compass. If no attendance has been saved yet, the sync starts from 1 January of the current year. After that, it uses the latest saved attendance timestamp to speed up repeat syncs.
+        </p>
+        <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            style={buttonStyle}
+            onClick={handleAttendanceSync}
+            disabled={attendanceSyncing}
+          >
+            {attendanceSyncing ? "Syncing..." : "Sync from Compass"}
+          </button>
+        </div>
+      </div>
+
+      <div style={cardStyle}>
+        <h2 style={sectionTitleStyle}>Unapproved Full-Day Absences</h2>
+        <p style={sectionCopyStyle}>
+          Students who were absent for the full school day in Compass with unapproved absence statuses across `S1`, `S2`, `S3`, and `S4`.
+        </p>
+        {approvedAbsenceWeeks.length === 0 ? (
+          <p style={{ marginTop: 12 }}>
+            No unapproved full-day absences loaded for the current Compass sync and filters.
+          </p>
+        ) : (
+          <div style={{ marginTop: 16 }}>
+            {approvedAbsenceWeeks.map((week) => (
+              <div key={week.weekKey} style={{ marginBottom: 18 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: brandPalette.mintStrong,
+                    marginBottom: 10,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => toggleAbsenceWeek(week.weekKey)}
+                >
+                  <span>{formatSchoolWeekHeading(week.weekKey, week.weekLabel)}</span>
+                  <span>{expandedAbsenceWeeks[week.weekKey] ? "Hide" : "Show"}</span>
+                </div>
+                {expandedAbsenceWeeks[week.weekKey]
+                  ? week.rows.map((row) => (
+                      <div key={row.id} style={{ ...entryCardStyle, marginTop: 8 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: 12,
+                            alignItems: "center",
+                            marginBottom: 8,
+                          }}
+                        >
+                          <div style={{ fontWeight: "bold" }}>
+                            {row.studentName} ({row.studentCode})
+                          </div>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "6px 10px",
+                              borderRadius: 999,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: "#8a1f1f",
+                              background: "#ffeaea",
+                              border: "1px solid #f1b0b0",
+                            }}
+                          >
+                            Unapproved absence
+                          </span>
+                        </div>
+                        <div>
+                          <strong>Date:</strong> {row.startText}
+                        </div>
+                        <div>
+                          <strong>Periods:</strong> {row.periodsText}
+                        </div>
+                        <div>
+                          <strong>Status:</strong> {row.statusName || "-"}
+                        </div>
+                        <div>
+                          <strong>Code:</strong> {row.statusCode || "-"}
+                        </div>
+                        <div>
+                          <strong>Homegroup:</strong> {row.homegroup || "-"}
+                        </div>
+                        <div>
+                          <strong>Year:</strong> {row.yearLevel || "-"}
+                        </div>
+                      </div>
+                    ))
+                  : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div style={cardStyle}>
         <h2 style={sectionTitleStyle}>Attendance CSV Import</h2>
         <p style={sectionCopyStyle}>
@@ -141,7 +283,7 @@ export default function AttendanceImportCard({
       <div style={cardStyle}>
         <h2 style={sectionTitleStyle}>Attendance Records</h2>
         <p style={sectionCopyStyle}>
-          Review weekly late counts from the imported attendance CSV, then assign students with 3 or more late arrivals to detention.
+          Review weekly late counts from synced Compass data or imported attendance CSV, then assign students with 3 or more late arrivals to detention.
         </p>
         <div style={statGridStyle}>
           <div style={statCardStyle}>
@@ -204,21 +346,25 @@ export default function AttendanceImportCard({
             />{" "}
             Only 3+
           </label>
-          <select
-            style={inputStyle}
-            value={attendanceSessionId}
-            onChange={(e) => setAttendanceSessionId(e.target.value)}
-          >
-            <option value="">Choose detention session</option>
-            {sessions.map((session) => (
-              <option key={session.id} value={session.id}>
-                {session.name} - {session.date}
-              </option>
-            ))}
-          </select>
-          <button type="button" style={buttonStyle} onClick={assignSelectedAttendanceGroups}>
-            Assign selected
-          </button>
+          {attendancePreviewMode ? null : (
+            <>
+              <select
+                style={inputStyle}
+                value={attendanceSessionId}
+                onChange={(e) => setAttendanceSessionId(e.target.value)}
+              >
+                <option value="">Choose detention session</option>
+                {sessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {session.name} - {session.date}
+                  </option>
+                ))}
+              </select>
+              <button type="button" style={buttonStyle} onClick={assignSelectedAttendanceGroups}>
+                Assign selected
+              </button>
+            </>
+          )}
         </div>
 
         <div style={{ marginTop: 20 }}>
@@ -247,8 +393,17 @@ export default function AttendanceImportCard({
                 </div>
                 {expandedWeeks[week.weekKey]
                   ? week.groups.map((group) => {
-                      const status = getAttendanceStatus(group);
-                      const canSelect = group.count >= 3 && !status.assigned;
+                      const status = attendancePreviewMode
+                        ? { assigned: false, label: "Preview only" }
+                        : getAttendanceStatus(group);
+                      const canSelect =
+                        !attendancePreviewMode && group.count >= 3 && !status.assigned;
+                      const schoolLateCount = group.rows.filter(
+                        (row) => row.attendanceType === "School late"
+                      ).length;
+                      const classLateCount = group.rows.filter(
+                        (row) => row.attendanceType === "Class late"
+                      ).length;
 
                       return (
                         <div
@@ -272,13 +427,15 @@ export default function AttendanceImportCard({
                             }}
                           >
                             <div style={{ display: "flex", gap: 10 }}>
-                              <input
-                                type="checkbox"
-                                checked={selectedAttendanceKeys.includes(group.key)}
-                                disabled={!canSelect}
-                                onChange={() => toggleAttendanceSelection(group.key)}
-                                onClick={(e) => e.stopPropagation()}
-                              />
+                              {attendancePreviewMode ? null : (
+                                <input
+                                  type="checkbox"
+                                  checked={selectedAttendanceKeys.includes(group.key)}
+                                  disabled={!canSelect}
+                                  onChange={() => toggleAttendanceSelection(group.key)}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              )}
                               <div>
                                 <button
                                   type="button"
@@ -303,11 +460,54 @@ export default function AttendanceImportCard({
                                 >
                                   <strong>{group.name}</strong> - {group.count}
                                 </button>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    flexWrap: "wrap",
+                                    marginTop: 6,
+                                  }}
+                                >
+                                  {schoolLateCount > 0 ? (
+                                    <span
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        padding: "4px 9px",
+                                        borderRadius: 999,
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        color: brandPalette.navy,
+                                        background: brandPalette.mintSoft,
+                                        border: "1px solid rgba(92,231,170,0.45)",
+                                      }}
+                                    >
+                                      School late: {schoolLateCount}
+                                    </span>
+                                  ) : null}
+                                  {classLateCount > 0 ? (
+                                    <span
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        padding: "4px 9px",
+                                        borderRadius: 999,
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        color: "#8a341f",
+                                        background: "#fff2eb",
+                                        border: "1px solid #f1c7b1",
+                                      }}
+                                    >
+                                      Class late: {classLateCount}
+                                    </span>
+                                  ) : null}
+                                </div>
                               </div>
                             </div>
                             <div style={{ textAlign: "right" }}>
                               <div>{status.label}</div>
-                              {group.count >= 3 ? (
+                              {!attendancePreviewMode && group.count >= 3 ? (
                                 <button
                                   type="button"
                                   style={buttonStyle}
