@@ -178,20 +178,29 @@ async function handleCreateUser(adminSupabase, body, res) {
 }
 
 async function handleUpdateUser(adminSupabase, body, res) {
-  const { id, email, fullName, role, yearLevels } = body || {};
+  const { id, email, fullName, role, yearLevels, newPassword } = body || {};
 
   if (!id || !email || !fullName || !role) {
     return res.status(400).json({ error: "User id, email, full name, and role are required." });
   }
 
-  const { error: updateError } = await adminSupabase.auth.admin.updateUserById(id, {
+  const updatePayload = {
     email,
     user_metadata: {
       full_name: fullName,
       role,
       year_levels: normalizeYearLevels(yearLevels),
     },
-  });
+  };
+
+  if (newPassword) {
+    updatePayload.password = newPassword;
+  }
+
+  const { error: updateError } = await adminSupabase.auth.admin.updateUserById(
+    id,
+    updatePayload
+  );
 
   if (updateError) {
     return res.status(400).json({ error: updateError.message });

@@ -342,7 +342,7 @@ export default function SessionRollCard({
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onDeleteEntry(entry.id);
+                    onDeleteEntry(entry);
                   }}
                 >
                   Delete student

@@ -15,7 +15,7 @@ export default function CreateSessionCard({
     <div style={cardStyle}>
       <h2 style={sectionTitleStyle}>Create Session</h2>
       <p style={sectionCopyStyle}>
-        Add the next detention slot with a clear time, location, and supervisor.
+        Add the next detention slot with a clear time and location.
       </p>
       <form onSubmit={handleCreateSession}>
         <input
@@ -42,14 +42,6 @@ export default function CreateSessionCard({
           value={newSession.location}
           onChange={(e) =>
             setNewSession({ ...newSession, location: e.target.value })
-          }
-        />
-        <input
-          style={inputStyle}
-          placeholder="Supervisor"
-          value={newSession.supervisor}
-          onChange={(e) =>
-            setNewSession({ ...newSession, supervisor: e.target.value })
           }
         />
         <button style={buttonStyle} type="submit">

@@ -33,6 +33,7 @@ export default function AdminAccountsCard({
     fullName: "",
     role: "supervisor",
     yearLevels: "",
+    newPassword: "",
   });
 
   async function handleCreate(event) {
@@ -61,6 +62,7 @@ export default function AdminAccountsCard({
       fullName: account.full_name || "",
       role: account.role || "supervisor",
       yearLevels: (account.year_levels || []).join(", "),
+      newPassword: "",
     });
   }
 
@@ -71,10 +73,12 @@ export default function AdminAccountsCard({
         <p style={sectionCopyStyle}>
           Admins can create users and set an initial password. Users can then update their own password from the Account page.
         </p>
-        <form onSubmit={handleCreate}>
+        <form onSubmit={handleCreate} autoComplete="off">
           <input
             style={inputStyle}
             type="email"
+            name="create-account-email"
+            autoComplete="off"
             placeholder="Email"
             value={createEmail}
             onChange={(event) => setCreateEmail(event.target.value)}
@@ -82,12 +86,16 @@ export default function AdminAccountsCard({
           <input
             style={inputStyle}
             type="password"
+            name="create-account-password"
+            autoComplete="new-password"
             placeholder="Temporary password"
             value={createPassword}
             onChange={(event) => setCreatePassword(event.target.value)}
           />
           <input
             style={inputStyle}
+            name="create-account-full-name"
+            autoComplete="off"
             placeholder="Full name"
             value={createFullName}
             onChange={(event) => setCreateFullName(event.target.value)}
@@ -130,10 +138,15 @@ export default function AdminAccountsCard({
           accounts.map((account) => (
             <div key={account.id} style={entryCardStyle}>
               {editingAccountId === account.id ? (
-                <>
+                <div key={`editing-${account.id}`}>
+                  <div style={{ fontWeight: "bold", marginBottom: 10 }}>
+                    Editing {account.full_name || account.email}
+                  </div>
                   <input
                     style={inputStyle}
                     type="email"
+                    name={`edit-account-email-${account.id}`}
+                    autoComplete="off"
                     value={editForm.email}
                     onChange={(event) =>
                       setEditForm((prev) => ({ ...prev, email: event.target.value }))
@@ -141,6 +154,8 @@ export default function AdminAccountsCard({
                   />
                   <input
                     style={inputStyle}
+                    name={`edit-account-full-name-${account.id}`}
+                    autoComplete="off"
                     value={editForm.fullName}
                     onChange={(event) =>
                       setEditForm((prev) => ({ ...prev, fullName: event.target.value }))
@@ -159,10 +174,23 @@ export default function AdminAccountsCard({
                   </select>
                   <input
                     style={inputStyle}
+                    name={`edit-account-year-levels-${account.id}`}
+                    autoComplete="off"
                     placeholder="Year levels (comma separated, e.g. 7, 8)"
                     value={editForm.yearLevels}
                     onChange={(event) =>
                       setEditForm((prev) => ({ ...prev, yearLevels: event.target.value }))
+                    }
+                  />
+                  <input
+                    style={inputStyle}
+                    type="password"
+                    name={`edit-account-password-${account.id}`}
+                    autoComplete="new-password"
+                    placeholder="Issue new password (optional)"
+                    value={editForm.newPassword}
+                    onChange={(event) =>
+                      setEditForm((prev) => ({ ...prev, newPassword: event.target.value }))
                     }
                   />
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -177,6 +205,7 @@ export default function AdminAccountsCard({
                           fullName: editForm.fullName,
                           role: editForm.role,
                           yearLevels: editForm.yearLevels,
+                          newPassword: editForm.newPassword,
                         });
                         if (ok) {
                           setEditingAccountId(null);
@@ -193,7 +222,7 @@ export default function AdminAccountsCard({
                       Cancel
                     </button>
                   </div>
-                </>
+                </div>
               ) : (
                 <>
                   <div style={{ fontWeight: "bold" }}>

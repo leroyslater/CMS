@@ -177,95 +177,6 @@ export default function AttendanceImportCard({
       </div>
 
       <div style={cardStyle}>
-        <h2 style={sectionTitleStyle}>Unapproved Full-Day Absences</h2>
-        <p style={sectionCopyStyle}>
-          Students who were absent for the full school day in Compass with unapproved absence statuses across `S1`, `S2`, `S3`, and `S4`.
-        </p>
-        {approvedAbsenceWeeks.length === 0 ? (
-          <p style={{ marginTop: 12 }}>
-            No unapproved full-day absences loaded for the current Compass sync and filters.
-          </p>
-        ) : (
-          <div style={{ marginTop: 16 }}>
-            {approvedAbsenceWeeks.map((week) => (
-              <div key={week.weekKey} style={{ marginBottom: 18 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                    color: brandPalette.mintStrong,
-                    marginBottom: 10,
-                    cursor: "pointer",
-                  }}
-                  onClick={() => toggleAbsenceWeek(week.weekKey)}
-                >
-                  <span>{formatSchoolWeekHeading(week.weekKey, week.weekLabel)}</span>
-                  <span>{expandedAbsenceWeeks[week.weekKey] ? "Hide" : "Show"}</span>
-                </div>
-                {expandedAbsenceWeeks[week.weekKey]
-                  ? week.rows.map((row) => (
-                      <div key={row.id} style={{ ...entryCardStyle, marginTop: 8 }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            gap: 12,
-                            alignItems: "center",
-                            marginBottom: 8,
-                          }}
-                        >
-                          <div style={{ fontWeight: "bold" }}>
-                            {row.studentName} ({row.studentCode})
-                          </div>
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              padding: "6px 10px",
-                              borderRadius: 999,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: "#8a1f1f",
-                              background: "#ffeaea",
-                              border: "1px solid #f1b0b0",
-                            }}
-                          >
-                            Unapproved absence
-                          </span>
-                        </div>
-                        <div>
-                          <strong>Date:</strong> {row.startText}
-                        </div>
-                        <div>
-                          <strong>Periods:</strong> {row.periodsText}
-                        </div>
-                        <div>
-                          <strong>Status:</strong> {row.statusName || "-"}
-                        </div>
-                        <div>
-                          <strong>Code:</strong> {row.statusCode || "-"}
-                        </div>
-                        <div>
-                          <strong>Homegroup:</strong> {row.homegroup || "-"}
-                        </div>
-                        <div>
-                          <strong>Year:</strong> {row.yearLevel || "-"}
-                        </div>
-                      </div>
-                    ))
-                  : null}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div style={cardStyle}>
         <h2 style={sectionTitleStyle}>Attendance CSV Import</h2>
         <p style={sectionCopyStyle}>
           Upload the attendance CSV report to load both school-late and class-late records. A real
@@ -599,6 +510,95 @@ export default function AttendanceImportCard({
             ))
           )}
         </div>
+      </div>
+
+      <div style={cardStyle}>
+        <h2 style={sectionTitleStyle}>Unapproved Full-Day Absences</h2>
+        <p style={sectionCopyStyle}>
+          Students who were absent for the full school day in Compass with unapproved absence statuses across `S1`, `S2`, `S3`, and `S4`.
+        </p>
+        {approvedAbsenceWeeks.length === 0 ? (
+          <p style={{ marginTop: 12 }}>
+            No unapproved full-day absences loaded for the current Compass sync and filters.
+          </p>
+        ) : (
+          <div style={{ marginTop: 16 }}>
+            {approvedAbsenceWeeks.map((week) => (
+              <div key={week.weekKey} style={{ marginBottom: 18 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: brandPalette.mintStrong,
+                    marginBottom: 10,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => toggleAbsenceWeek(week.weekKey)}
+                >
+                  <span>{formatSchoolWeekHeading(week.weekKey, week.weekLabel)}</span>
+                  <span>{expandedAbsenceWeeks[week.weekKey] ? "Hide" : "Show"}</span>
+                </div>
+                {expandedAbsenceWeeks[week.weekKey]
+                  ? week.rows.map((row) => (
+                      <div key={row.id} style={{ ...entryCardStyle, marginTop: 8 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: 12,
+                            alignItems: "center",
+                            marginBottom: 8,
+                          }}
+                        >
+                          <div style={{ fontWeight: "bold" }}>
+                            {row.studentName} ({row.studentCode})
+                          </div>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "6px 10px",
+                              borderRadius: 999,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: "#8a1f1f",
+                              background: "#ffeaea",
+                              border: "1px solid #f1b0b0",
+                            }}
+                          >
+                            Unapproved absence
+                          </span>
+                        </div>
+                        <div>
+                          <strong>Date:</strong> {row.startText}
+                        </div>
+                        <div>
+                          <strong>Periods:</strong> {row.periodsText}
+                        </div>
+                        <div>
+                          <strong>Status:</strong> {row.statusName || "-"}
+                        </div>
+                        <div>
+                          <strong>Code:</strong> {row.statusCode || "-"}
+                        </div>
+                        <div>
+                          <strong>Homegroup:</strong> {row.homegroup || "-"}
+                        </div>
+                        <div>
+                          <strong>Year:</strong> {row.yearLevel || "-"}
+                        </div>
+                      </div>
+                    ))
+                  : null}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );

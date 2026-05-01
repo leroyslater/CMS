@@ -155,6 +155,7 @@ export default function App() {
         : [
             { id: "dashboard", label: "Dashboard" },
             { id: "sessions", label: "Sessions" },
+            { id: "supervisor", label: "Supervisor" },
             { id: "chronicle", label: "Chronicle" },
             { id: "attendance", label: "Attendance" },
             { id: "students", label: "Student" },
@@ -693,29 +694,36 @@ export default function App() {
     setSessionSaving(true);
 
     try {
-      const { error: entriesError } = await supabase
-        .from("entries")
-        .delete()
-        .eq("session_id", sessionId);
-
-      if (entriesError) {
-        setDataError(entriesError.message);
+      const accessToken = authSession?.access_token;
+      if (!accessToken) {
+        setDataError("You need to be signed in before deleting sessions.");
         return;
       }
 
-      const { error: sessionError } = await supabase
-        .from("sessions")
-        .delete()
-        .eq("id", sessionId);
+      const response = await fetch("/api/session-delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ sessionId }),
+      });
 
-      if (sessionError) {
-        setDataError(sessionError.message);
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setDataError(result?.error || "Failed to delete session.");
         return;
       }
 
       removeSession(sessionId);
-      const toRemove = entries.filter((entry) => entry.session_id === sessionId);
-      toRemove.forEach((entry) => removeEntry(entry.id));
+      const deletedEntryIds = Array.isArray(result?.deletedEntryIds)
+        ? result.deletedEntryIds
+        : entries
+            .filter((entry) => entry.session_id === sessionId)
+            .map((entry) => entry.id);
+      deletedEntryIds.forEach((entryId) => removeEntry(entryId));
+      await loadData();
       setMessage("Session deleted.");
     } finally {
       setSessionSaving(false);
@@ -746,7 +754,16 @@ export default function App() {
     }
   }
 
-  async function handleDeleteEntry(entryId) {
+  async function handleDeleteEntry(entryToDelete) {
+    const entryId = entryToDelete?.id;
+    const sessionId = entryToDelete?.session_id;
+    const studentName = entryToDelete?.student_name;
+
+    if (!entryId) {
+      setDataError("Could not identify the session entry to remove.");
+      return;
+    }
+
     const confirmed = window.confirm(
       "Remove this student from the selected session?"
     );
@@ -757,14 +774,51 @@ export default function App() {
     setEntrySavingId(entryId);
 
     try {
-      const { error } = await supabase.from("entries").delete().eq("id", entryId);
+      const normalizedStudentName = String(studentName || "").trim().toLowerCase();
+      const matchingEntryIds =
+        sessionId && normalizedStudentName
+          ? entries
+              .filter(
+                (entry) =>
+                  entry.session_id === sessionId &&
+                  String(entry.student_name || "").trim().toLowerCase() ===
+                    normalizedStudentName
+              )
+              .map((entry) => entry.id)
+          : [entryId];
 
-      if (error) {
-        setDataError(error.message);
+      const idsToDelete = Array.from(
+        new Set(matchingEntryIds.filter(Boolean))
+      );
+
+      const accessToken = authSession?.access_token;
+      if (!accessToken) {
+        setDataError("You need to be signed in before removing students from sessions.");
         return;
       }
 
-      removeEntry(entryId);
+      const response = await fetch("/api/session-entry-delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ ids: idsToDelete }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setDataError(result?.error || "Failed to remove student from session.");
+        return;
+      }
+
+      const deletedIds = Array.isArray(result?.deletedIds)
+        ? result.deletedIds
+        : idsToDelete;
+
+      deletedIds.forEach((id) => removeEntry(id));
+      await loadData();
       setMessage("Student removed from session roll.");
     } finally {
       setEntrySavingId(null);
@@ -2400,6 +2454,20 @@ export default function App() {
                 getStudentHistory={getStudentHistory}
               />
             </>
+          ) : null}
+
+          {activePage === "supervisor" ? (
+            <SessionRollCard
+              selectedSessionId={selectedSessionId}
+              setSelectedSessionId={setSelectedSessionId}
+              sessions={sessions}
+              selectedSession={selectedSession}
+              selectedSessionEntries={selectedSessionEntries}
+              setSelectedStudent={setSelectedStudent}
+              isSupervisor={true}
+              onUpdateAttendance={handleUpdateAttendance}
+              attendanceUpdatingId={attendanceUpdatingId}
+            />
           ) : null}
 
           {activePage === "chronicle" ? (

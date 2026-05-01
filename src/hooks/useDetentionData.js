@@ -124,10 +124,10 @@ export function useDetentionData(authSession, todayString) {
 
   function resetNewSession() {
     return {
-      name: "",
+      name: getDefaultSessionName(todayString),
       date: todayString,
-      time: "",
-      location: "",
+      time: "3:15pm",
+      location: "Room 218",
       supervisor: "",
     };
   }
@@ -178,4 +178,73 @@ async function runRestRead(runQuery, label) {
       },
     };
   }
+}
+
+const VICTORIAN_TERM_WEEKS_2026 = [
+  { term: 1, firstWeekEnding: "2026-01-30", lastWeekEnding: "2026-04-03" },
+  { term: 2, firstWeekEnding: "2026-04-24", lastWeekEnding: "2026-06-26" },
+  { term: 3, firstWeekEnding: "2026-07-17", lastWeekEnding: "2026-09-18" },
+  { term: 4, firstWeekEnding: "2026-10-09", lastWeekEnding: "2026-12-18" },
+];
+
+function getDefaultSessionName(baseDateString) {
+  const referenceDate = parseIsoDateOnly(baseDateString);
+  if (!referenceDate) {
+    return "Monday";
+  }
+
+  const upcomingMonday = getUpcomingMonday(referenceDate);
+  const weekEnding = getWeekEndingFriday(upcomingMonday);
+  const termWeek = getVictorianTermWeek(weekEnding);
+
+  if (!termWeek) {
+    return "Monday";
+  }
+
+  return `Term ${termWeek.term} Week ${termWeek.week} Monday`;
+}
+
+function parseIsoDateOnly(value) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getUpcomingMonday(date) {
+  const monday = new Date(date);
+  const day = monday.getDay();
+  const daysUntilMonday = day === 1 ? 0 : ((8 - day) % 7 || 7);
+  monday.setDate(monday.getDate() + daysUntilMonday);
+  return monday;
+}
+
+function getWeekEndingFriday(date) {
+  const friday = new Date(date);
+  const day = friday.getDay();
+  const daysUntilFriday = (5 - day + 7) % 7;
+  friday.setDate(friday.getDate() + daysUntilFriday);
+  return friday;
+}
+
+function getVictorianTermWeek(weekEndingDate) {
+  const weekEndingKey = [
+    weekEndingDate.getFullYear(),
+    String(weekEndingDate.getMonth() + 1).padStart(2, "0"),
+    String(weekEndingDate.getDate()).padStart(2, "0"),
+  ].join("-");
+
+  const term = VICTORIAN_TERM_WEEKS_2026.find(
+    (item) =>
+      weekEndingKey >= item.firstWeekEnding && weekEndingKey <= item.lastWeekEnding
+  );
+
+  if (!term) return null;
+
+  const firstWeekEnding = parseIsoDateOnly(term.firstWeekEnding);
+  const weekOffset = Math.round((weekEndingDate - firstWeekEnding) / 604800000);
+
+  return {
+    term: term.term,
+    week: weekOffset + 1,
+  };
 }
