@@ -29,6 +29,18 @@ export function useAuth() {
 
   const loadProfileEvent = useEffectEvent(loadProfile);
 
+  function detectRecoveryModeFromUrl() {
+    if (typeof window === "undefined") return false;
+
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const searchParams = new URLSearchParams(window.location.search);
+
+    return (
+      hashParams.get("type") === "recovery" ||
+      searchParams.get("type") === "recovery"
+    );
+  }
+
   useEffect(() => {
     let isMounted = true;
 
@@ -47,8 +59,7 @@ export function useAuth() {
         if (!isMounted) return;
         setAuthSession(session);
         setBooting(false);
-        const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-        setPasswordRecoveryMode(params.get("type") === "recovery");
+        setPasswordRecoveryMode(detectRecoveryModeFromUrl());
 
         if (session?.user) {
           await loadProfileEvent({
@@ -74,6 +85,8 @@ export function useAuth() {
         setPasswordRecoveryMode(true);
       } else if (_event === "SIGNED_OUT") {
         setPasswordRecoveryMode(false);
+      } else {
+        setPasswordRecoveryMode(detectRecoveryModeFromUrl());
       }
 
       setAuthSession(session);

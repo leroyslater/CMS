@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   brandPalette,
@@ -6,6 +6,10 @@ import {
   cardStyle,
   entryCardStyle,
   inputStyle,
+  mobileNavBarStyle,
+  mobileNavButtonStyle,
+  navButtonActiveStyle,
+  navButtonStyle,
   sectionCopyStyle,
   sectionTitleStyle,
   statCardStyle,
@@ -17,24 +21,17 @@ import {
 export default function ChronicleImportCard({
   handleChronicleSync,
   handleChronicleUpload,
-  chronicleSyncYear,
-  setChronicleSyncYear,
   chronicleSyncModifiedSince,
   setChronicleSyncModifiedSince,
   chronicleSyncing,
-  chronicleSearch,
-  setChronicleSearch,
-  chronicleYearFilter,
+  chronicleYearLevels,
   setChronicleYearFilter,
-  chronicleHomegroupFilter,
-  setChronicleHomegroupFilter,
   chronicleOnly3Plus,
   setChronicleOnly3Plus,
   chronicleSessionId,
   setChronicleSessionId,
   sessions,
   chronicleYearOptions,
-  chronicleHomegroupOptions,
   assignSelectedChronicleGroups,
   filteredChronicle,
   selectedChronicleKeys,
@@ -110,6 +107,19 @@ export default function ChronicleImportCard({
   }, [chronicleWeeks.length, filteredChronicle, getChronicleStatus]);
   const [expandedWeeks, setExpandedWeeks] = useState({});
   const [uploadInputKey, setUploadInputKey] = useState(0);
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth <= 768 : false
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    function updateIsMobile() {
+      setIsMobile(window.innerWidth <= 768);
+    }
+    updateIsMobile();
+    window.addEventListener("resize", updateIsMobile);
+    return () => window.removeEventListener("resize", updateIsMobile);
+  }, []);
 
   function toggleWeek(weekKey) {
     setExpandedWeeks((prev) => ({
@@ -131,15 +141,6 @@ export default function ChronicleImportCard({
           Sync Chronicle data directly from Compass, or use a CSV upload as a fallback.
         </p>
         <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-          <input
-            style={inputStyle}
-            type="number"
-            min="2000"
-            max="2100"
-            placeholder="Year"
-            value={chronicleSyncYear}
-            onChange={(event) => setChronicleSyncYear(event.target.value)}
-          />
           <input
             style={inputStyle}
             type="date"
@@ -194,37 +195,49 @@ export default function ChronicleImportCard({
             <div style={statValueStyle}>{summary.readyCount}</div>
           </div>
         </div>
+        <div
+          style={
+            isMobile
+              ? mobileNavBarStyle
+              : { display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }
+          }
+        >
+          <button
+            type="button"
+            style={{
+              ...(isMobile ? mobileNavButtonStyle : navButtonStyle),
+              ...(chronicleYearLevels.length === 0 ? navButtonActiveStyle : {}),
+            }}
+            onClick={() => setChronicleYearFilter([])}
+          >
+            All years
+          </button>
+          {chronicleYearOptions.map((yearLevel) => {
+            const selected = chronicleYearLevels.includes(yearLevel);
+            return (
+              <button
+                key={yearLevel}
+                type="button"
+                style={{
+                  ...(isMobile ? mobileNavButtonStyle : navButtonStyle),
+                  ...(selected ? navButtonActiveStyle : {}),
+                }}
+                onClick={() =>
+                  setChronicleYearFilter((current) =>
+                    current.includes(yearLevel)
+                      ? current.filter((level) => level !== yearLevel)
+                      : [...current, yearLevel].sort(
+                          (a, b) => Number(a) - Number(b) || a.localeCompare(b)
+                        )
+                  )
+                }
+              >
+                Year {yearLevel}
+              </button>
+            );
+          })}
+        </div>
         <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-          <input
-            style={inputStyle}
-            placeholder="Search student"
-            value={chronicleSearch}
-            onChange={(e) => setChronicleSearch(e.target.value)}
-          />
-          <select
-            style={inputStyle}
-            value={chronicleYearFilter}
-            onChange={(e) => setChronicleYearFilter(e.target.value)}
-          >
-            <option value="">All years</option>
-            {chronicleYearOptions.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-          <select
-            style={inputStyle}
-            value={chronicleHomegroupFilter}
-            onChange={(e) => setChronicleHomegroupFilter(e.target.value)}
-          >
-            <option value="">All homegroups</option>
-            {chronicleHomegroupOptions.map((homegroup) => (
-              <option key={homegroup} value={homegroup}>
-                {homegroup}
-              </option>
-            ))}
-          </select>
           <label>
             <input
               type="checkbox"

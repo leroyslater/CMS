@@ -67,22 +67,16 @@ export default function App() {
   const [attendanceRows, setAttendanceRows] = useState([]);
   const [selectedChronicleKeys, setSelectedChronicleKeys] = useState([]);
   const [selectedChronicleKey, setSelectedChronicleKey] = useState("");
-  const [chronicleSearch, setChronicleSearch] = useState("");
-  const [chronicleYearFilter, setChronicleYearFilter] = useState("");
-  const [chronicleHomegroupFilter, setChronicleHomegroupFilter] = useState("");
+  const [chronicleYearFilter, setChronicleYearFilter] = useState([]);
   const [chronicleOnly3Plus, setChronicleOnly3Plus] = useState(false);
   const [chronicleSyncing, setChronicleSyncing] = useState(false);
-  const [chronicleSyncYear, setChronicleSyncYear] = useState(
-    String(new Date().getFullYear())
-  );
+  const [chronicleSyncYear] = useState(String(new Date().getFullYear()));
   const [chronicleSyncModifiedSince, setChronicleSyncModifiedSince] = useState(
     `${new Date().getFullYear()}-01-01`
   );
   const [selectedAttendanceKeys, setSelectedAttendanceKeys] = useState([]);
   const [selectedAttendanceKey, setSelectedAttendanceKey] = useState("");
-  const [attendanceSearch, setAttendanceSearch] = useState("");
-  const [attendanceYearFilter, setAttendanceYearFilter] = useState("");
-  const [attendanceHomegroupFilter, setAttendanceHomegroupFilter] = useState("");
+  const [attendanceYearFilter, setAttendanceYearFilter] = useState([]);
   const [attendanceOnly3Plus, setAttendanceOnly3Plus] = useState(false);
   const [attendanceSessionId, setAttendanceSessionId] = useState("");
   const [attendanceSyncing, setAttendanceSyncing] = useState(false);
@@ -144,6 +138,14 @@ export default function App() {
   const dashboardYearLevels = useMemo(
     () => normalizeYearLevels(dashboardYearFilter),
     [dashboardYearFilter]
+  );
+  const chronicleYearLevels = useMemo(
+    () => normalizeYearLevels(chronicleYearFilter),
+    [chronicleYearFilter]
+  );
+  const attendanceYearLevels = useMemo(
+    () => normalizeYearLevels(attendanceYearFilter),
+    [attendanceYearFilter]
   );
   const shouldScopeDashboardByYear = dashboardYearLevels.length > 0;
   const pages = useMemo(
@@ -259,6 +261,9 @@ export default function App() {
       }
 
       setPasswordRecoveryMode(false);
+      if (typeof window !== "undefined") {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
       setMessage("Password updated.");
       return true;
     } finally {
@@ -291,7 +296,7 @@ export default function App() {
         return false;
       }
 
-      setMessage("Account created.");
+      setMessage("Account created and password setup email sent.");
       await loadAccounts();
       return true;
     } catch (err) {
@@ -1436,44 +1441,21 @@ export default function App() {
   const filteredChronicle = useMemo(() => {
     return chronicleGrouped.filter((g) => {
       if (chronicleOnly3Plus && g.count < 3) return false;
-      if (
-        chronicleSearch &&
-        !g.name.toLowerCase().includes(chronicleSearch.toLowerCase())
-      )
+      if (chronicleYearLevels.length > 0 && !chronicleYearLevels.includes(g.yearLevel)) {
         return false;
-      if (chronicleYearFilter && g.yearLevel !== chronicleYearFilter)
-        return false;
-      if (
-        chronicleHomegroupFilter &&
-        g.homegroup !== chronicleHomegroupFilter
-      )
-        return false;
+      }
       return true;
     });
   }, [
     chronicleGrouped,
-    chronicleSearch,
-    chronicleYearFilter,
-    chronicleHomegroupFilter,
+    chronicleYearLevels,
     chronicleOnly3Plus,
   ]);
 
   const filteredAttendance = useMemo(() => {
     return attendancePageGrouped.filter((group) => {
       if (attendanceOnly3Plus && group.count < 3) return false;
-      if (
-        attendanceSearch &&
-        !group.name.toLowerCase().includes(attendanceSearch.toLowerCase())
-      ) {
-        return false;
-      }
-      if (attendanceYearFilter && group.yearLevel !== attendanceYearFilter) {
-        return false;
-      }
-      if (
-        attendanceHomegroupFilter &&
-        group.homegroup !== attendanceHomegroupFilter
-      ) {
+      if (attendanceYearLevels.length > 0 && !attendanceYearLevels.includes(group.yearLevel)) {
         return false;
       }
       return true;
@@ -1481,39 +1463,19 @@ export default function App() {
   }, [
     attendancePageGrouped,
     attendanceOnly3Plus,
-    attendanceSearch,
-    attendanceYearFilter,
-    attendanceHomegroupFilter,
+    attendanceYearLevels,
   ]);
 
   const filteredAttendanceApprovedAbsences = useMemo(() => {
     return attendanceApprovedAbsenceRows.filter((row) => {
-      const searchText = attendanceSearch.toLowerCase();
-
-      if (
-        attendanceSearch &&
-        !`${row.studentName} ${row.studentCode} ${row.statusName}`
-          .toLowerCase()
-          .includes(searchText)
-      ) {
-        return false;
-      }
-      if (attendanceYearFilter && row.yearLevel !== attendanceYearFilter) {
-        return false;
-      }
-      if (
-        attendanceHomegroupFilter &&
-        row.homegroup !== attendanceHomegroupFilter
-      ) {
+      if (attendanceYearLevels.length > 0 && !attendanceYearLevels.includes(row.yearLevel)) {
         return false;
       }
       return true;
     });
   }, [
     attendanceApprovedAbsenceRows,
-    attendanceSearch,
-    attendanceYearFilter,
-    attendanceHomegroupFilter,
+    attendanceYearLevels,
   ]);
 
   const chronicleYearOptions = useMemo(
@@ -1528,22 +1490,6 @@ export default function App() {
     () =>
       Array.from(
         new Set(attendancePageGrouped.map((group) => group.yearLevel).filter(Boolean))
-      ).sort(),
-    [attendancePageGrouped]
-  );
-
-  const chronicleHomegroupOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(chronicleGrouped.map((g) => g.homegroup).filter(Boolean))
-      ).sort(),
-    [chronicleGrouped]
-  );
-
-  const attendanceHomegroupOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(attendancePageGrouped.map((group) => group.homegroup).filter(Boolean))
       ).sort(),
     [attendancePageGrouped]
   );
@@ -2279,6 +2225,20 @@ export default function App() {
     );
   }
 
+  if (passwordRecoveryMode) {
+    return (
+      <div style={pageStyle}>
+        {error ? <p style={statusErrorStyle}>{error}</p> : null}
+        {message ? <p style={statusSuccessStyle}>{message}</p> : null}
+        <AccountSettingsCard
+          recoveryMode={passwordRecoveryMode}
+          updatingPassword={updatingPassword}
+          onUpdatePassword={handleUpdatePassword}
+        />
+      </div>
+    );
+  }
+
   return (
     <div style={pageStyle}>
       <AppHeader
@@ -2474,24 +2434,17 @@ export default function App() {
             <ChronicleImportCard
               handleChronicleSync={handleChronicleSync}
               handleChronicleUpload={handleChronicleUpload}
-              chronicleSyncYear={chronicleSyncYear}
-              setChronicleSyncYear={setChronicleSyncYear}
               chronicleSyncModifiedSince={chronicleSyncModifiedSince}
               setChronicleSyncModifiedSince={setChronicleSyncModifiedSince}
               chronicleSyncing={chronicleSyncing}
-              chronicleSearch={chronicleSearch}
-              setChronicleSearch={setChronicleSearch}
-              chronicleYearFilter={chronicleYearFilter}
+              chronicleYearLevels={chronicleYearLevels}
               setChronicleYearFilter={setChronicleYearFilter}
-              chronicleHomegroupFilter={chronicleHomegroupFilter}
-              setChronicleHomegroupFilter={setChronicleHomegroupFilter}
               chronicleOnly3Plus={chronicleOnly3Plus}
               setChronicleOnly3Plus={setChronicleOnly3Plus}
               chronicleSessionId={chronicleSessionId}
               setChronicleSessionId={setChronicleSessionId}
               sessions={sessions}
               chronicleYearOptions={chronicleYearOptions}
-              chronicleHomegroupOptions={chronicleHomegroupOptions}
               assignSelectedChronicleGroups={assignSelectedChronicleGroups}
               filteredChronicle={filteredChronicle}
               selectedChronicleKeys={selectedChronicleKeys}
@@ -2509,19 +2462,14 @@ export default function App() {
               handleAttendanceUpload={handleAttendanceUpload}
               attendanceSyncing={attendanceSyncing}
               attendancePreviewMode={attendancePreviewMode}
-              attendanceSearch={attendanceSearch}
-              setAttendanceSearch={setAttendanceSearch}
-              attendanceYearFilter={attendanceYearFilter}
+              attendanceYearLevels={attendanceYearLevels}
               setAttendanceYearFilter={setAttendanceYearFilter}
-              attendanceHomegroupFilter={attendanceHomegroupFilter}
-              setAttendanceHomegroupFilter={setAttendanceHomegroupFilter}
               attendanceOnly3Plus={attendanceOnly3Plus}
               setAttendanceOnly3Plus={setAttendanceOnly3Plus}
               attendanceSessionId={attendanceSessionId}
               setAttendanceSessionId={setAttendanceSessionId}
               sessions={sessions}
               attendanceYearOptions={attendanceYearOptions}
-              attendanceHomegroupOptions={attendanceHomegroupOptions}
               assignSelectedAttendanceGroups={assignSelectedAttendanceGroups}
               filteredAttendance={filteredAttendance}
               filteredAttendanceApprovedAbsences={filteredAttendanceApprovedAbsences}

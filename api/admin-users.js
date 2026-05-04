@@ -141,15 +141,17 @@ async function handleListUsers(adminSupabase, res) {
 }
 
 async function handleCreateUser(adminSupabase, body, res) {
-  const { email, password, fullName, role, yearLevels } = body || {};
+  const { email, fullName, role, yearLevels } = body || {};
 
-  if (!email || !password || !fullName || !role) {
-    return res.status(400).json({ error: "Email, password, full name, and role are required." });
+  if (!email || !fullName || !role) {
+    return res.status(400).json({ error: "Email, full name, and role are required." });
   }
+
+  const temporaryPassword = createTemporaryPassword();
 
   const { data, error } = await adminSupabase.auth.admin.createUser({
     email,
-    password,
+    password: temporaryPassword,
     email_confirm: true,
     user_metadata: {
       full_name: fullName,
@@ -174,7 +176,17 @@ async function handleCreateUser(adminSupabase, body, res) {
     return res.status(500).json({ error: profileError.message });
   }
 
-  return res.status(200).json({ userId: data.user.id });
+  const { error: resetError } = await adminSupabase.auth.resetPasswordForEmail(email, {
+    redirectTo: process.env.APP_URL || "https://striketrack.org",
+  });
+
+  if (resetError) {
+    return res.status(500).json({
+      error: `Account created, but reset email failed: ${resetError.message}`,
+    });
+  }
+
+  return res.status(200).json({ userId: data.user.id, emailed: true });
 }
 
 async function handleUpdateUser(adminSupabase, body, res) {
@@ -275,4 +287,8 @@ function normalizeYearLevels(value) {
   }
 
   return [];
+}
+
+function createTemporaryPassword() {
+  return `StrikeTrack!${Math.random().toString(36).slice(2, 12)}A1`;
 }

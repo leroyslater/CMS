@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   brandPalette,
@@ -6,6 +6,10 @@ import {
   cardStyle,
   entryCardStyle,
   inputStyle,
+  mobileNavBarStyle,
+  mobileNavButtonStyle,
+  navButtonActiveStyle,
+  navButtonStyle,
   sectionCopyStyle,
   sectionTitleStyle,
   statCardStyle,
@@ -19,19 +23,14 @@ export default function AttendanceImportCard({
   handleAttendanceUpload,
   attendanceSyncing,
   attendancePreviewMode,
-  attendanceSearch,
-  setAttendanceSearch,
-  attendanceYearFilter,
+  attendanceYearLevels,
   setAttendanceYearFilter,
-  attendanceHomegroupFilter,
-  setAttendanceHomegroupFilter,
   attendanceOnly3Plus,
   setAttendanceOnly3Plus,
   attendanceSessionId,
   setAttendanceSessionId,
   sessions,
   attendanceYearOptions,
-  attendanceHomegroupOptions,
   assignSelectedAttendanceGroups,
   filteredAttendance,
   filteredAttendanceApprovedAbsences,
@@ -86,6 +85,9 @@ export default function AttendanceImportCard({
   const [expandedWeeks, setExpandedWeeks] = useState({});
   const [expandedAbsenceWeeks, setExpandedAbsenceWeeks] = useState({});
   const [uploadInputKey, setUploadInputKey] = useState(0);
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth <= 768 : false
+  );
   const summary = useMemo(() => {
     const groupCount = filteredAttendance.length;
     const incidentCount = filteredAttendance.reduce(
@@ -151,6 +153,16 @@ export default function AttendanceImportCard({
       [weekKey]: !prev[weekKey],
     }));
   }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    function updateIsMobile() {
+      setIsMobile(window.innerWidth <= 768);
+    }
+    updateIsMobile();
+    window.addEventListener("resize", updateIsMobile);
+    return () => window.removeEventListener("resize", updateIsMobile);
+  }, []);
 
   async function onAttendanceFileChange(event) {
     await handleAttendanceUpload(event);
@@ -218,37 +230,49 @@ export default function AttendanceImportCard({
             <div style={statValueStyle}>{summary.classLateCount}</div>
           </div>
         </div>
+        <div
+          style={
+            isMobile
+              ? mobileNavBarStyle
+              : { display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }
+          }
+        >
+          <button
+            type="button"
+            style={{
+              ...(isMobile ? mobileNavButtonStyle : navButtonStyle),
+              ...(attendanceYearLevels.length === 0 ? navButtonActiveStyle : {}),
+            }}
+            onClick={() => setAttendanceYearFilter([])}
+          >
+            All years
+          </button>
+          {attendanceYearOptions.map((yearLevel) => {
+            const selected = attendanceYearLevels.includes(yearLevel);
+            return (
+              <button
+                key={yearLevel}
+                type="button"
+                style={{
+                  ...(isMobile ? mobileNavButtonStyle : navButtonStyle),
+                  ...(selected ? navButtonActiveStyle : {}),
+                }}
+                onClick={() =>
+                  setAttendanceYearFilter((current) =>
+                    current.includes(yearLevel)
+                      ? current.filter((level) => level !== yearLevel)
+                      : [...current, yearLevel].sort(
+                          (a, b) => Number(a) - Number(b) || a.localeCompare(b)
+                        )
+                  )
+                }
+              >
+                Year {yearLevel}
+              </button>
+            );
+          })}
+        </div>
         <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-          <input
-            style={inputStyle}
-            placeholder="Search student"
-            value={attendanceSearch}
-            onChange={(e) => setAttendanceSearch(e.target.value)}
-          />
-          <select
-            style={inputStyle}
-            value={attendanceYearFilter}
-            onChange={(e) => setAttendanceYearFilter(e.target.value)}
-          >
-            <option value="">All years</option>
-            {attendanceYearOptions.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-          <select
-            style={inputStyle}
-            value={attendanceHomegroupFilter}
-            onChange={(e) => setAttendanceHomegroupFilter(e.target.value)}
-          >
-            <option value="">All homegroups</option>
-            {attendanceHomegroupOptions.map((homegroup) => (
-              <option key={homegroup} value={homegroup}>
-                {homegroup}
-              </option>
-            ))}
-          </select>
           <label>
             <input
               type="checkbox"

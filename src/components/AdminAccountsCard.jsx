@@ -23,7 +23,6 @@ export default function AdminAccountsCard({
   onResetPassword,
 }) {
   const [createEmail, setCreateEmail] = useState("");
-  const [createPassword, setCreatePassword] = useState("");
   const [createFullName, setCreateFullName] = useState("");
   const [createRole, setCreateRole] = useState("supervisor");
   const [createYearLevels, setCreateYearLevels] = useState("");
@@ -40,7 +39,6 @@ export default function AdminAccountsCard({
     event.preventDefault();
     const ok = await onCreateAccount({
       email: createEmail,
-      password: createPassword,
       fullName: createFullName,
       role: createRole,
       yearLevels: createYearLevels,
@@ -48,7 +46,6 @@ export default function AdminAccountsCard({
 
     if (ok) {
       setCreateEmail("");
-      setCreatePassword("");
       setCreateFullName("");
       setCreateRole("supervisor");
       setCreateYearLevels("");
@@ -71,7 +68,7 @@ export default function AdminAccountsCard({
       <div style={cardStyle}>
         <h2 style={sectionTitleStyle}>Create Account</h2>
         <p style={sectionCopyStyle}>
-          Admins can create users and set an initial password. Users can then update their own password from the Account page.
+          Admins can create users and send them a password setup email straight away. Users then choose their own password from the reset link.
         </p>
         <form onSubmit={handleCreate} autoComplete="off">
           <input
@@ -82,15 +79,6 @@ export default function AdminAccountsCard({
             placeholder="Email"
             value={createEmail}
             onChange={(event) => setCreateEmail(event.target.value)}
-          />
-          <input
-            style={inputStyle}
-            type="password"
-            name="create-account-password"
-            autoComplete="new-password"
-            placeholder="Temporary password"
-            value={createPassword}
-            onChange={(event) => setCreatePassword(event.target.value)}
           />
           <input
             style={inputStyle}
@@ -118,9 +106,9 @@ export default function AdminAccountsCard({
           <button
             type="submit"
             style={buttonStyle}
-            disabled={!createEmail || !createPassword || !createFullName || creatingAccount}
+            disabled={!createEmail || !createFullName || creatingAccount}
           >
-            {creatingAccount ? "Creating..." : "Create account"}
+            {creatingAccount ? "Creating..." : "Create and send email"}
           </button>
         </form>
       </div>
@@ -128,7 +116,7 @@ export default function AdminAccountsCard({
       <div style={cardStyle}>
         <h2 style={sectionTitleStyle}>All Users</h2>
         <p style={sectionCopyStyle}>
-          Review, edit, delete, and reset passwords for all user accounts.
+          Review, edit, delete, and send password reset emails for all user accounts.
         </p>
         {loadingAccounts ? (
           <p>Loading users...</p>
