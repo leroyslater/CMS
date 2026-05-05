@@ -8,6 +8,16 @@ import {
   sectionTitleStyle,
 } from "../styles/uiStyles";
 import { useState } from "react";
+import ccMapPin from "../assets/cc-map-pin.svg";
+
+const DETENTION_REASON_OPTIONS = [
+  "Disruptive behaviour",
+  "Failure to follow instruction",
+  "Late to class",
+  "Refusal to complete set tasks",
+  "Inappropriate use of ICT",
+  "Other",
+];
 
 export default function SessionRollCard({
   selectedSessionId,
@@ -25,6 +35,8 @@ export default function SessionRollCard({
   onUpdateEntry,
   onDeleteEntry,
   entrySavingId,
+  onSubmitRoll,
+  rollSubmitting = false,
 }) {
   const [editingSession, setEditingSession] = useState(false);
   const [sessionForm, setSessionForm] = useState({
@@ -41,6 +53,25 @@ export default function SessionRollCard({
     issued_by: "",
     attendance: "Unmarked",
   });
+  const orderedSessionEntries = [...selectedSessionEntries].sort((a, b) => {
+    const yearCompare =
+      Number(a.year_level || 0) - Number(b.year_level || 0) ||
+      String(a.year_level || "").localeCompare(String(b.year_level || ""));
+
+    if (yearCompare !== 0) return yearCompare;
+
+    const homegroupCompare = String(a.homegroup || "").localeCompare(
+      String(b.homegroup || "")
+    );
+    if (homegroupCompare !== 0) return homegroupCompare;
+
+    return String(a.student_name || "").localeCompare(String(b.student_name || ""));
+  });
+  const rollReadyToSubmit =
+    orderedSessionEntries.length > 0 &&
+    orderedSessionEntries.every(
+      (entry) => entry.attendance === "Present" || entry.attendance === "Absent"
+    );
 
   function startEditingSession() {
     if (!selectedSession) return;
@@ -63,6 +94,334 @@ export default function SessionRollCard({
       issued_by: entry.issued_by || "",
       attendance: entry.attendance || "Unmarked",
     });
+  }
+
+  function handlePrintSession() {
+    if (!selectedSession) return;
+
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) return;
+
+    const studentRows = orderedSessionEntries
+      .map(
+        (entry) => `
+          <tr>
+            <td>${escapeHtml(entry.student_name || "")}</td>
+            <td>${escapeHtml(entry.year_level || "")}</td>
+            <td>${escapeHtml(entry.homegroup || "")}</td>
+            <td class="reason-cell">${escapeHtml(entry.reason || "")}</td>
+            <td>${escapeHtml(entry.attendance || "Unmarked")}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <title>${escapeHtml(selectedSession.name || "Session Roll")}</title>
+          <style>
+            @page {
+              size: landscape;
+              margin: 12mm;
+            }
+            body {
+              font-family: "Avenir Next", "Segoe UI", sans-serif;
+              padding: 32px;
+              color: #17334b;
+            }
+            h1 {
+              margin: 0 0 12px;
+              font-size: 28px;
+            }
+            .meta {
+              margin: 0 0 24px;
+              color: #4b587c;
+              line-height: 1.6;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            th, td {
+              border: 1px solid #c8d8e1;
+              padding: 10px 12px;
+              text-align: left;
+              vertical-align: top;
+            }
+            .reason-cell {
+              max-width: 280px;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            th {
+              background: #def9ee;
+              color: #14314b;
+            }
+            @media print {
+              body {
+                padding: 0;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${escapeHtml(selectedSession.name || "Session Roll")}</h1>
+          <div class="meta">
+            <div><strong>Date:</strong> ${escapeHtml(formatDisplayDate(selectedSession.date))}</div>
+            <div><strong>Time:</strong> ${escapeHtml(selectedSession.time || "-")}</div>
+            <div><strong>Location:</strong> ${escapeHtml(selectedSession.location || "-")}</div>
+            <div><strong>Supervisor:</strong> ${escapeHtml(selectedSession.supervisor || "-")}</div>
+            <div><strong>Students:</strong> ${orderedSessionEntries.length}</div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Year</th>
+                <th>Homegroup</th>
+                <th>Reason</th>
+                <th>Attendance</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${studentRows || '<tr><td colspan="5">No students assigned to this session yet.</td></tr>'}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }
+
+  function handlePrintDetentionSlips() {
+    if (!selectedSession) return;
+
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) return;
+
+    const slipMarkup = orderedSessionEntries
+      .map(
+        (entry, index) => `
+          <section class="slip ${index > 0 && index % 2 === 0 ? "page-break" : ""}">
+            <div class="slip-header">
+              <div class="brand-block">
+                <img class="brand-mark" src="${ccMapPin}" alt="Collingwood College" />
+                <div>
+                  <div class="eyebrow">Collingwood College</div>
+                  <h1>Detention Slip</h1>
+                </div>
+              </div>
+              <div class="session-meta">
+                <div><strong>Date:</strong> ${escapeHtml(formatDisplayDate(selectedSession.date))}</div>
+                <div><strong>Time:</strong> ${escapeHtml(selectedSession.time || "-")}</div>
+                <div><strong>Room:</strong> ${escapeHtml(selectedSession.location || "-")}</div>
+              </div>
+            </div>
+            <div class="student-block">
+              <div class="student-name">${escapeHtml(entry.student_name || "")}</div>
+              <div class="student-meta">
+                Year ${escapeHtml(entry.year_level || "-")} · ${escapeHtml(entry.homegroup || "-")}
+              </div>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Session</span>
+              <span>${escapeHtml(selectedSession.name || "-")}</span>
+            </div>
+            <div class="reason-block">
+              <div class="detail-label">Reason</div>
+              <div class="reason-grid">
+                ${renderReasonChecklist()}
+              </div>
+            </div>
+            <div class="signature-row">
+              <div class="signature-block">
+                <div class="signature-line"></div>
+                <div class="signature-label">Student signature</div>
+              </div>
+              <div class="signature-block">
+                <div class="signature-line"></div>
+                <div class="signature-label">Staff signature</div>
+              </div>
+            </div>
+          </section>
+        `
+      )
+      .join("");
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <title>${escapeHtml(selectedSession.name || "Detention Slips")}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 10mm;
+            }
+            body {
+              font-family: "Avenir Next", "Segoe UI", sans-serif;
+              color: #071c74;
+              margin: 0;
+              background: #ffffff;
+            }
+            .slip {
+              border: 2px solid #071c74;
+              border-radius: 16px;
+              padding: 18px 20px;
+              min-height: calc(50vh - 24px);
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              gap: 12px;
+              margin-bottom: 14px;
+              background: linear-gradient(180deg, #f7f9ff 0%, #ffffff 24%);
+              box-shadow: inset 0 0 0 1px rgba(7, 28, 116, 0.08);
+            }
+            .page-break {
+              break-before: page;
+            }
+            .slip-header {
+              display: flex;
+              justify-content: space-between;
+              gap: 16px;
+              align-items: flex-start;
+              padding-bottom: 12px;
+              border-bottom: 2px solid rgba(7, 28, 116, 0.12);
+            }
+            .brand-block {
+              display: flex;
+              align-items: center;
+              gap: 14px;
+            }
+            .brand-mark {
+              width: 54px;
+              height: 62px;
+              object-fit: contain;
+            }
+            .eyebrow {
+              text-transform: uppercase;
+              letter-spacing: 0.16em;
+              font-size: 11px;
+              color: #071c74;
+              font-weight: 700;
+              margin-bottom: 6px;
+            }
+            h1 {
+              margin: 0;
+              font-size: 28px;
+              color: #071c74;
+            }
+            .session-meta {
+              color: #3f4f95;
+              font-size: 13px;
+              line-height: 1.6;
+              text-align: right;
+              background: rgba(7, 28, 116, 0.05);
+              border: 1px solid rgba(7, 28, 116, 0.12);
+              border-radius: 12px;
+              padding: 10px 12px;
+            }
+            .student-block {
+              background: #eef2ff;
+              border: 1px solid rgba(7, 28, 116, 0.12);
+              border-radius: 12px;
+              padding: 12px 14px;
+            }
+            .student-name {
+              font-size: 24px;
+              font-weight: 800;
+              margin-bottom: 4px;
+              color: #071c74;
+            }
+            .student-meta {
+              color: #3f4f95;
+              font-size: 14px;
+            }
+            .detail-row {
+              display: grid;
+              grid-template-columns: 110px 1fr;
+              gap: 12px;
+              font-size: 15px;
+              align-items: start;
+            }
+            .reason-block {
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+            }
+            .reason-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 8px 18px;
+            }
+            .reason-option {
+              display: flex;
+              align-items: flex-start;
+              gap: 8px;
+              font-size: 14px;
+              color: #071c74;
+            }
+            .reason-checkbox {
+              width: 14px;
+              height: 14px;
+              border: 1.5px solid #071c74;
+              border-radius: 3px;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 11px;
+              line-height: 1;
+              margin-top: 1px;
+              flex: 0 0 14px;
+            }
+            .reason-other-text {
+              font-size: 13px;
+              color: #4b587c;
+              margin-top: 4px;
+            }
+            .detail-label {
+              font-weight: 700;
+              color: #3f4f95;
+            }
+            .signature-row {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 24px;
+              margin-top: auto;
+              padding-top: 20px;
+            }
+            .signature-line {
+              border-bottom: 1px solid #071c74;
+              height: 28px;
+              margin-bottom: 6px;
+            }
+            .signature-label {
+              font-size: 12px;
+              color: #3f4f95;
+            }
+            @media print {
+              body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${slipMarkup || "<p>No students assigned to this session yet.</p>"}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   }
 
   return (
@@ -174,9 +533,26 @@ export default function SessionRollCard({
                 <div style={{ marginTop: 4, color: "#4b587c" }}>
                   Supervisor: {selectedSession.supervisor || "-"}
                 </div>
+                <div style={{ marginTop: 4, color: "#4b587c" }}>
+                  Students: {selectedSessionEntries.length}
+                </div>
               </div>
               {!isSupervisor ? (
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    style={smallButtonStyle}
+                    onClick={handlePrintSession}
+                  >
+                    Print roll
+                  </button>
+                  <button
+                    type="button"
+                    style={smallButtonStyle}
+                    onClick={handlePrintDetentionSlips}
+                  >
+                    Print slips
+                  </button>
                   <button
                     type="button"
                     style={smallButtonStyle}
@@ -197,36 +573,142 @@ export default function SessionRollCard({
                   </button>
                 </div>
               ) : null}
+              {isSupervisor ? (
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    style={smallButtonStyle}
+                    onClick={handlePrintSession}
+                  >
+                    Print roll
+                  </button>
+                  <button
+                    type="button"
+                    style={smallButtonStyle}
+                    onClick={handlePrintDetentionSlips}
+                  >
+                    Print slips
+                  </button>
+                </div>
+              ) : null}
             </div>
           )}
         </div>
       ) : null}
-      {selectedSessionEntries.length === 0 ? (
+      {orderedSessionEntries.length === 0 ? (
         <p>No students assigned to this session yet.</p>
       ) : (
-        selectedSessionEntries.map((entry) => (
+        <>
+        {isSupervisor ? (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: "12px 14px",
+              borderRadius: 14,
+              background: "#eef3f7",
+              color: "#4b587c",
+              fontSize: 14,
+            }}
+          >
+            <div style={{ marginBottom: 8 }}>
+              Mark every student as present or absent, then submit the completed roll.
+            </div>
+            <button
+              type="button"
+              style={{
+                ...buttonStyle,
+                opacity: rollReadyToSubmit && !rollSubmitting ? 1 : 0.65,
+                cursor: rollReadyToSubmit && !rollSubmitting ? "pointer" : "not-allowed",
+              }}
+              disabled={!rollReadyToSubmit || rollSubmitting}
+              onClick={() => onSubmitRoll?.(selectedSessionId)}
+            >
+              {rollSubmitting ? "Submitting..." : "Submit roll"}
+            </button>
+          </div>
+        ) : null}
+        {orderedSessionEntries.map((entry) => {
+          const attendanceStatus = entry.attendance || "Unmarked";
+          const isPresent = attendanceStatus === "Present";
+          const isAbsent = attendanceStatus === "Absent";
+
+          return (
           <div
             key={entry.id}
-            style={{ ...entryCardStyle, cursor: "pointer" }}
+            style={{
+              ...entryCardStyle,
+              cursor: "pointer",
+              padding: 10,
+              marginBottom: 8,
+              border: isPresent
+                ? "2px solid rgba(57, 213, 146, 0.45)"
+                : isAbsent
+                  ? "2px solid #e9a19a"
+                  : entryCardStyle.border,
+              background: isPresent
+                ? "rgba(92, 231, 170, 0.12)"
+                : isAbsent
+                  ? "#fff2eb"
+                  : entryCardStyle.background,
+            }}
             onClick={() => {
               if (!isSupervisor) {
                 setSelectedStudent(entry.student_name);
               }
             }}
           >
-            <strong>{entry.student_name}</strong>
-            <div>
-              Year {entry.year_level} · {entry.homegroup}
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                alignItems: "baseline",
+                marginBottom: 4,
+                flexWrap: "wrap",
+              }}
+            >
+              <strong>{entry.student_name}</strong>
+              <span style={{ color: "#4b587c", fontSize: 13 }}>
+                Year {entry.year_level || "-"} · {entry.homegroup || "-"}
+              </span>
             </div>
-            <div>
-              <strong>Reason:</strong> {entry.reason}
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                alignItems: "center",
+                flexWrap: "wrap",
+                color: "#4b587c",
+                fontSize: 14,
+              }}
+            >
+              <span style={{ minWidth: 0, flex: "1 1 260px" }}>
+                Reason: {entry.reason || "-"}
+              </span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "4px 9px",
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: isPresent ? "#14532d" : isAbsent ? "#8a1f1f" : "#4b587c",
+                  background: isPresent ? "#dcfce7" : isAbsent ? "#ffeaea" : "#eef3f7",
+                  border: isPresent
+                    ? "1px solid #86efac"
+                    : isAbsent
+                      ? "1px solid #f1b0b0"
+                      : "1px solid #c8d8e1",
+                }}
+              >
+                {attendanceStatus}
+              </span>
             </div>
-            <div>Attendance: {entry.attendance || "Unmarked"}</div>
             {isSupervisor ? (
-              <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 <button
                   type="button"
-                  style={buttonStyle}
+                  style={{ ...buttonStyle, padding: "10px 14px" }}
                   disabled={attendanceUpdatingId === entry.id}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -241,6 +723,7 @@ export default function SessionRollCard({
                   type="button"
                   style={{
                     ...buttonStyle,
+                    padding: "10px 14px",
                     background: "linear-gradient(135deg, #a44b35 0%, #7c2d1f 100%)",
                     boxShadow: "0 10px 22px rgba(124, 45, 31, 0.18)",
                   }}
@@ -256,7 +739,7 @@ export default function SessionRollCard({
                 </button>
               </div>
             ) : editingEntryId === entry.id ? (
-              <div style={{ marginTop: 12 }}>
+              <div style={{ marginTop: 10 }}>
                 <select
                   style={inputStyle}
                   value={entryForm.session_id}
@@ -301,7 +784,7 @@ export default function SessionRollCard({
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <button
                     type="button"
-                    style={buttonStyle}
+                    style={{ ...buttonStyle, padding: "10px 14px" }}
                     disabled={entrySavingId === entry.id}
                     onClick={async () => {
                       const ok = await onUpdateEntry(entry.id, entryForm);
@@ -322,7 +805,7 @@ export default function SessionRollCard({
                 </div>
               </div>
             ) : (
-              <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 <button
                   type="button"
                   style={smallButtonStyle}
@@ -350,8 +833,46 @@ export default function SessionRollCard({
               </div>
             )}
           </div>
-        ))
+          );
+        })}
+        </>
       )}
     </div>
   );
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function formatDisplayDate(value) {
+  if (!value) return "-";
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return String(value);
+
+  const [, year, month, day] = match;
+  const date = new Date(`${year}-${month}-${day}T12:00:00`);
+  return new Intl.DateTimeFormat("en-AU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+function renderReasonChecklist() {
+  return DETENTION_REASON_OPTIONS.map((option) => {
+    return `
+      <div class="reason-option">
+        <span class="reason-checkbox"></span>
+        <span>
+          ${escapeHtml(option)}
+        </span>
+      </div>
+    `;
+  }).join("");
 }

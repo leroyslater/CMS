@@ -31,6 +31,7 @@ export default function DashboardHome({
   attendanceTwoPlusThisWeek,
   lowAttendanceStudents,
   topDetentionStudents,
+  missedDetentionStudents,
   upcomingSession,
   upcomingSessionAssignments,
   todos,
@@ -376,6 +377,41 @@ export default function DashboardHome({
       </div>
 
       <div style={mobileTwoColStyle}>
+        <div style={cardStyle}>
+          <h2 style={sectionTitleStyle}>Missed Detention</h2>
+          {isMobile ? null : (
+            <p style={sectionCopyStyle}>
+              Students who have been marked absent on the detention session roll.
+            </p>
+          )}
+          {missedDetentionStudents.length === 0 ? (
+            <p>No students have been marked absent from detention yet.</p>
+          ) : (
+            missedDetentionStudents.map((student) => (
+              <div
+                key={`missed-detention-${student.name}`}
+                style={{ ...entryCardStyle, cursor: "pointer" }}
+                onClick={() => setSelectedStudent(student.name)}
+              >
+                <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                <div style={{ color: brandPalette.muted }}>
+                  {student.count} missed detention{student.count === 1 ? "" : "s"}
+                  {!isMobile && student.homegroup ? ` · ${student.homegroup}` : ""}
+                  {!isMobile && student.yearLevel ? ` · Year ${student.yearLevel}` : ""}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <UpcomingSessionAssignmentsCard
+          upcomingSession={upcomingSession}
+          assignedStudents={upcomingSessionAssignments}
+          setSelectedStudent={setSelectedStudent}
+        />
+      </div>
+
+      <div style={mobileTwoColStyle}>
         {isMobile ? null : (
           <div style={cardStyle}>
             <h2 style={sectionTitleStyle}>Chronicle Watchlist</h2>
@@ -510,14 +546,6 @@ export default function DashboardHome({
           )}
         </div>
 
-        <UpcomingSessionAssignmentsCard
-          upcomingSession={upcomingSession}
-          assignedStudents={upcomingSessionAssignments}
-          setSelectedStudent={setSelectedStudent}
-        />
-      </div>
-
-      <div style={mobileTwoColStyle}>
         {isMobile ? null : (
           <div style={cardStyle}>
             <h2 style={sectionTitleStyle}>Minor Behaviour Teachers</h2>

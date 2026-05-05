@@ -10,6 +10,7 @@ import ConfigScreen from "./components/ConfigScreen";
 import CreateSessionCard from "./components/CreateSessionCard";
 import DashboardHome from "./components/DashboardHome";
 import DashboardStats from "./components/DashboardStats";
+import MissedDetentionCard from "./components/MissedDetentionCard";
 import SessionRollCard from "./components/SessionRollCard";
 import StudentHistoryCard from "./components/StudentHistoryCard";
 import StudentUploadCard from "./components/StudentUploadCard";
@@ -95,6 +96,7 @@ export default function App() {
   const [studentSearch, setStudentSearch] = useState("");
   const [studentDropdownOpen, setStudentDropdownOpen] = useState(false);
   const [attendanceUpdatingId, setAttendanceUpdatingId] = useState(null);
+  const [rollSubmitting, setRollSubmitting] = useState(false);
   const [sessionSaving, setSessionSaving] = useState(false);
   const [entrySavingId, setEntrySavingId] = useState(null);
   const [todos, setTodos] = useState([]);
@@ -661,6 +663,42 @@ export default function App() {
       setMessage(`Attendance marked as ${attendance.toLowerCase()}.`);
     } finally {
       setAttendanceUpdatingId(null);
+    }
+  }
+
+  async function handleSubmitRoll(sessionId) {
+    clearError();
+    setMessage("");
+    setRollSubmitting(true);
+
+    try {
+      const accessToken = authSession?.access_token;
+      if (!accessToken) {
+        setDataError("You need to be signed in before submitting the roll.");
+        return;
+      }
+
+      const response = await fetch("/api/session-roll-submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ sessionId }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setDataError(result?.error || "Failed to submit the session roll.");
+        return;
+      }
+
+      setMessage(
+        `Roll submitted. Emailed ${result?.recipients || 0} staff with ${result?.presentCount || 0} present and ${result?.absentCount || 0} absent.`
+      );
+    } finally {
+      setRollSubmitting(false);
     }
   }
 
@@ -1514,6 +1552,33 @@ export default function App() {
     return entries.filter((entry) => entry.session_id === selectedSessionId);
   }, [entries, selectedSessionId]);
 
+  const missedDetentionEntries = useMemo(() => {
+    return entries
+      .filter((entry) => entry.attendance === "Absent")
+      .map((entry) => {
+        const session = sessions.find((item) => item.id === entry.session_id);
+        return {
+          ...entry,
+          session_name: session?.name || "",
+          session_date: session?.date || "",
+          session_time: session?.time || "",
+        };
+      })
+      .sort((a, b) => {
+        const yearCompare =
+          Number(a.year_level || 0) - Number(b.year_level || 0) ||
+          String(a.year_level || "").localeCompare(String(b.year_level || ""));
+        if (yearCompare !== 0) return yearCompare;
+
+        const dateCompare = String(b.session_date || "").localeCompare(
+          String(a.session_date || "")
+        );
+        if (dateCompare !== 0) return dateCompare;
+
+        return String(a.student_name || "").localeCompare(String(b.student_name || ""));
+      });
+  }, [entries, sessions]);
+
   const filteredStudents = useMemo(() => {
     return students.filter((student) =>
       `${student.first_name} ${student.last_name} ${student.student_code} ${student.year_level} ${student.homegroup || ""}`
@@ -2109,9 +2174,44 @@ export default function App() {
       )
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-        .slice(0, 5),
+      .slice(0, 5),
     [dashboardStudentNames, entries, shouldScopeDashboardByYear]
   );
+
+  const missedDetentionStudents = useMemo(() => {
+    const grouped = {};
+
+    entries.forEach((entry) => {
+      if (entry.attendance !== "Absent") return;
+      if (shouldScopeDashboardByYear && !dashboardStudentNames.has(entry.student_name)) {
+        return;
+      }
+
+      const key = entry.student_name || "";
+      if (!key) return;
+
+      if (!grouped[key]) {
+        grouped[key] = {
+          name: entry.student_name,
+          count: 0,
+          yearLevel: entry.year_level || "",
+          homegroup: entry.homegroup || "",
+        };
+      }
+
+      grouped[key].count += 1;
+    });
+
+    return Object.values(grouped)
+      .sort(
+        (a, b) =>
+          Number(a.yearLevel || 0) - Number(b.yearLevel || 0) ||
+          String(a.yearLevel || "").localeCompare(String(b.yearLevel || "")) ||
+          String(a.homegroup || "").localeCompare(String(b.homegroup || "")) ||
+          a.name.localeCompare(b.name)
+      )
+      .slice(0, 8);
+  }, [dashboardStudentNames, entries, shouldScopeDashboardByYear]);
 
   const topAttendanceStudents = useMemo(() => {
     const counts = {};
@@ -2261,6 +2361,8 @@ export default function App() {
           isSupervisor={true}
           onUpdateAttendance={handleUpdateAttendance}
           attendanceUpdatingId={attendanceUpdatingId}
+          onSubmitRoll={handleSubmitRoll}
+          rollSubmitting={rollSubmitting}
         />
       ) : (
         <>
@@ -2323,6 +2425,7 @@ export default function App() {
               attendanceTwoPlusThisWeek={attendanceTwoPlusThisWeek}
               lowAttendanceStudents={lowAttendanceStudents}
               topDetentionStudents={topDetentionStudents}
+              missedDetentionStudents={missedDetentionStudents}
               upcomingSession={upcomingSession}
               upcomingSessionAssignments={upcomingSessionAssignments}
               todos={todos.map((todo) => ({
@@ -2409,6 +2512,15 @@ export default function App() {
                 entrySavingId={entrySavingId}
               />
 
+              <MissedDetentionCard
+                missedEntries={missedDetentionEntries}
+                sessions={sessions}
+                onUpdateEntry={handleUpdateEntry}
+                onDeleteEntry={handleDeleteEntry}
+                entrySavingId={entrySavingId}
+                setSelectedStudent={setSelectedStudent}
+              />
+
               <StudentHistoryCard
                 selectedStudent={selectedStudent}
                 getStudentHistory={getStudentHistory}
@@ -2427,6 +2539,8 @@ export default function App() {
               isSupervisor={true}
               onUpdateAttendance={handleUpdateAttendance}
               attendanceUpdatingId={attendanceUpdatingId}
+              onSubmitRoll={handleSubmitRoll}
+              rollSubmitting={rollSubmitting}
             />
           ) : null}
 
