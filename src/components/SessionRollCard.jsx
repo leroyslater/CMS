@@ -19,6 +19,20 @@ const DETENTION_REASON_OPTIONS = [
   "Other",
 ];
 
+const LATE_ACTIVITY_PROMPTS = [
+  "Regulate and relate: What was happening for you before school or class, and what helped or could have helped you get ready to learn?",
+  "Motivation and meaning: Why does arriving on time matter for your learning and for the learning of others?",
+  "Feedback and review: Who was affected by your lateness, and what impact did it have on the class or teacher?",
+  "Review and plan: What is one realistic strategy you will use next time to arrive ready to learn?",
+];
+
+const CHRONICLE_ACTIVITY_PROMPTS = [
+  "Regulate and relate: What was happening for you at the time, and what did you notice about your emotions, body, or reactions?",
+  "Relationships and safety: How did your behaviour affect the safety, learning, or relationships of others in the class?",
+  "Feedback and review: What would a better choice have looked like in that moment?",
+  "Review and repair: What is one clear strategy you will use next time to stay engaged and ready to learn?",
+];
+
 export default function SessionRollCard({
   selectedSessionId,
   setSelectedSessionId,
@@ -424,6 +438,279 @@ export default function SessionRollCard({
     printWindow.print();
   }
 
+  function handlePrintActivitySheets(activityType) {
+    if (!selectedSession) return;
+
+    const config =
+      activityType === "chronicle"
+        ? {
+            title: "Chronicle Reflection Sheet",
+            subtitle: "Behaviour reflection activity",
+            prompts: CHRONICLE_ACTIVITY_PROMPTS,
+          }
+        : {
+            title: "Late Reflection Sheet",
+            subtitle: "Lateness reflection activity",
+            prompts: LATE_ACTIVITY_PROMPTS,
+          };
+    const filteredEntries = orderedSessionEntries.filter((entry) =>
+      matchesActivityReason(entry.reason, activityType)
+    );
+
+    if (filteredEntries.length === 0) {
+      window.alert(
+        activityType === "chronicle"
+          ? "No Chronicle entries were found in this session."
+          : "No Attendance/Late entries were found in this session."
+      );
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=1000,height=800");
+    if (!printWindow) return;
+
+    const activityMarkup = filteredEntries
+      .map((entry, index) => {
+        const promptPages = [config.prompts.slice(0, 2), config.prompts.slice(2, 4)];
+
+        return promptPages
+          .map(
+            (prompts, pageIndex) => `
+              <section class="activity-sheet ${index > 0 || pageIndex > 0 ? "page-break" : ""}">
+                ${
+                  pageIndex === 0
+                    ? `
+                      <div class="sheet-header">
+                        <div class="brand-block">
+                          <img class="brand-mark" src="${ccMapPin}" alt="Collingwood College" />
+                          <div>
+                            <div class="eyebrow">Collingwood College</div>
+                            <h1>${escapeHtml(config.title)}</h1>
+                            <div class="subtitle">${escapeHtml(config.subtitle)} · Page ${pageIndex + 1} of 2</div>
+                          </div>
+                        </div>
+                        <div class="session-meta">
+                          <div><strong>Date:</strong> ${escapeHtml(formatDisplayDate(selectedSession.date))}</div>
+                          <div><strong>Time:</strong> ${escapeHtml(selectedSession.time || "-")}</div>
+                          <div><strong>Room:</strong> ${escapeHtml(selectedSession.location || "-")}</div>
+                        </div>
+                      </div>
+                      <div class="student-panel">
+                        <div class="student-name">${escapeHtml(entry.student_name || "")}</div>
+                        <div class="student-meta">
+                          Year ${escapeHtml(entry.year_level || "-")} · ${escapeHtml(entry.homegroup || "-")}
+                        </div>
+                      </div>
+                      <div class="detail-grid">
+                        <div class="detail-row">
+                          <span class="detail-label">Session</span>
+                          <span>${escapeHtml(selectedSession.name || "-")}</span>
+                        </div>
+                        <div class="detail-row">
+                          <span class="detail-label">Reason</span>
+                          <span>${escapeHtml(entry.reason || "-")}</span>
+                        </div>
+                      </div>
+                    `
+                    : `
+                      <div class="page-two-label">${escapeHtml(config.title)} · Page 2 of 2</div>
+                    `
+                }
+                <div class="prompt-list">
+                  ${prompts
+                    .map(
+                      (prompt, promptIndex) => `
+                        <div class="prompt-block">
+                          <div class="prompt-title">${pageIndex * 2 + promptIndex + 1}. ${escapeHtml(prompt)}</div>
+                          <div class="response-lines">
+                            <div class="line"></div>
+                            <div class="line"></div>
+                            <div class="line"></div>
+                            <div class="line"></div>
+                            <div class="line"></div>
+                            <div class="line"></div>
+                            <div class="line"></div>
+                            <div class="line"></div>
+                          </div>
+                        </div>
+                      `
+                    )
+                    .join("")}
+                </div>
+              </section>
+            `
+          )
+          .join("");
+      })
+      .join("");
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <title>${escapeHtml(config.title)}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 12mm;
+            }
+            body {
+              font-family: "Avenir Next", "Segoe UI", sans-serif;
+              color: #071c74;
+              margin: 0;
+              background: #ffffff;
+            }
+            .activity-sheet {
+              height: 273mm;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              gap: 14px;
+              border: 2px solid #071c74;
+              border-radius: 16px;
+              padding: 18px 20px;
+              background: linear-gradient(180deg, #f7f9ff 0%, #ffffff 22%);
+              overflow: hidden;
+              break-inside: avoid;
+              page-break-inside: avoid;
+            }
+            .page-break {
+              break-before: page;
+              page-break-before: always;
+            }
+            .page-two-label {
+              font-size: 14px;
+              font-weight: 700;
+              color: #3f4f95;
+              margin-bottom: 2px;
+            }
+            .sheet-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              gap: 16px;
+              padding-bottom: 12px;
+              border-bottom: 2px solid rgba(7, 28, 116, 0.12);
+            }
+            .brand-block {
+              display: flex;
+              align-items: center;
+              gap: 14px;
+            }
+            .brand-mark {
+              width: 54px;
+              height: 62px;
+              object-fit: contain;
+            }
+            .eyebrow {
+              text-transform: uppercase;
+              letter-spacing: 0.16em;
+              font-size: 11px;
+              color: #071c74;
+              font-weight: 700;
+              margin-bottom: 6px;
+            }
+            h1 {
+              margin: 0;
+              font-size: 28px;
+              color: #071c74;
+            }
+            .subtitle {
+              margin-top: 4px;
+              color: #3f4f95;
+              font-size: 14px;
+            }
+            .session-meta {
+              color: #3f4f95;
+              font-size: 13px;
+              line-height: 1.6;
+              text-align: right;
+              background: rgba(7, 28, 116, 0.05);
+              border: 1px solid rgba(7, 28, 116, 0.12);
+              border-radius: 12px;
+              padding: 10px 12px;
+            }
+            .student-panel {
+              background: #eef2ff;
+              border: 1px solid rgba(7, 28, 116, 0.12);
+              border-radius: 12px;
+              padding: 12px 14px;
+            }
+            .student-name {
+              font-size: 24px;
+              font-weight: 800;
+              margin-bottom: 4px;
+              color: #071c74;
+            }
+            .student-meta {
+              color: #3f4f95;
+              font-size: 14px;
+            }
+            .detail-grid {
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+            }
+            .detail-row {
+              display: grid;
+              grid-template-columns: 100px 1fr;
+              gap: 12px;
+              font-size: 15px;
+            }
+            .detail-label {
+              font-weight: 700;
+              color: #3f4f95;
+            }
+            .prompt-list {
+              display: grid;
+              grid-template-rows: 1fr 1fr;
+              gap: 14px;
+              margin-top: 6px;
+              flex: 1;
+              min-height: 0;
+            }
+            .prompt-block {
+              break-inside: avoid;
+              display: flex;
+              flex-direction: column;
+              min-height: 0;
+            }
+            .prompt-title {
+              font-weight: 700;
+              color: #071c74;
+              margin-bottom: 8px;
+              font-size: 14px;
+            }
+            .response-lines {
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+              flex: 1;
+              min-height: 0;
+            }
+            .line {
+              border-bottom: 1px solid rgba(7, 28, 116, 0.6);
+              min-height: 14px;
+            }
+            @media print {
+              body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${activityMarkup || "<p>No students assigned to this session yet.</p>"}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }
+
   return (
     <div style={cardStyle}>
       <h2 style={sectionTitleStyle}>Session Roll</h2>
@@ -556,6 +843,20 @@ export default function SessionRollCard({
                   <button
                     type="button"
                     style={smallButtonStyle}
+                    onClick={() => handlePrintActivitySheets("late")}
+                  >
+                    Print late activity
+                  </button>
+                  <button
+                    type="button"
+                    style={smallButtonStyle}
+                    onClick={() => handlePrintActivitySheets("chronicle")}
+                  >
+                    Print chronicle activity
+                  </button>
+                  <button
+                    type="button"
+                    style={smallButtonStyle}
                     onClick={startEditingSession}
                   >
                     Edit session
@@ -588,6 +889,20 @@ export default function SessionRollCard({
                     onClick={handlePrintDetentionSlips}
                   >
                     Print slips
+                  </button>
+                  <button
+                    type="button"
+                    style={smallButtonStyle}
+                    onClick={() => handlePrintActivitySheets("late")}
+                  >
+                    Print late activity
+                  </button>
+                  <button
+                    type="button"
+                    style={smallButtonStyle}
+                    onClick={() => handlePrintActivitySheets("chronicle")}
+                  >
+                    Print chronicle activity
                   </button>
                 </div>
               ) : null}
@@ -875,4 +1190,20 @@ function renderReasonChecklist() {
       </div>
     `;
   }).join("");
+}
+
+function matchesActivityReason(reason, activityType) {
+  const normalizedReason = String(reason || "").trim().toLowerCase();
+
+  if (!normalizedReason) {
+    return false;
+  }
+
+  if (activityType === "chronicle") {
+    return normalizedReason.includes("chronicle");
+  }
+
+  return (
+    normalizedReason.includes("attendance") || normalizedReason.includes("late")
+  );
 }
