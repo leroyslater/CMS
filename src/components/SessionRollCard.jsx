@@ -135,7 +135,7 @@ export default function SessionRollCard({
       <html lang="en">
         <head>
           <meta charset="UTF-8" />
-          <title>${escapeHtml(selectedSession.name || "Session Roll")}</title>
+          <title>${escapeHtml(selectedSession.name || "Detention Roll")}</title>
           <style>
             @page {
               size: landscape;
@@ -183,7 +183,7 @@ export default function SessionRollCard({
           </style>
         </head>
         <body>
-          <h1>${escapeHtml(selectedSession.name || "Session Roll")}</h1>
+          <h1>${escapeHtml(selectedSession.name || "Detention Roll")}</h1>
           <div class="meta">
             <div><strong>Date:</strong> ${escapeHtml(formatDisplayDate(selectedSession.date))}</div>
             <div><strong>Time:</strong> ${escapeHtml(selectedSession.time || "-")}</div>
@@ -202,7 +202,7 @@ export default function SessionRollCard({
               </tr>
             </thead>
             <tbody>
-              ${studentRows || '<tr><td colspan="5">No students assigned to this session yet.</td></tr>'}
+              ${studentRows || '<tr><td colspan="5">No students assigned to this detention yet.</td></tr>'}
             </tbody>
           </table>
         </body>
@@ -244,7 +244,7 @@ export default function SessionRollCard({
               </div>
             </div>
             <div class="detail-row">
-              <span class="detail-label">Session</span>
+              <span class="detail-label">Detention</span>
               <span>${escapeHtml(selectedSession.name || "-")}</span>
             </div>
             <div class="reason-block">
@@ -429,7 +429,7 @@ export default function SessionRollCard({
           </style>
         </head>
         <body>
-          ${slipMarkup || "<p>No students assigned to this session yet.</p>"}
+          ${slipMarkup || "<p>No students assigned to this detention yet.</p>"}
         </body>
       </html>
     `);
@@ -460,8 +460,8 @@ export default function SessionRollCard({
     if (filteredEntries.length === 0) {
       window.alert(
         activityType === "chronicle"
-          ? "No Chronicle entries were found in this session."
-          : "No Attendance/Late entries were found in this session."
+          ? "No Chronicle entries were found in this detention."
+          : "No Attendance/Late entries were found in this detention."
       );
       return;
     }
@@ -503,7 +503,7 @@ export default function SessionRollCard({
                       </div>
                       <div class="detail-grid">
                         <div class="detail-row">
-                          <span class="detail-label">Session</span>
+                          <span class="detail-label">Detention</span>
                           <span>${escapeHtml(selectedSession.name || "-")}</span>
                         </div>
                         <div class="detail-row">
@@ -702,7 +702,7 @@ export default function SessionRollCard({
           </style>
         </head>
         <body>
-          ${activityMarkup || "<p>No students assigned to this session yet.</p>"}
+          ${activityMarkup || "<p>No students assigned to this detention yet.</p>"}
         </body>
       </html>
     `);
@@ -713,18 +713,18 @@ export default function SessionRollCard({
 
   return (
     <div style={cardStyle}>
-      <h2 style={sectionTitleStyle}>Session Roll</h2>
+      <h2 style={sectionTitleStyle}>Detention Roll</h2>
       <p style={sectionCopyStyle}>
         {isSupervisor
           ? "Review the roll and mark each student as present or absent."
-          : "Review the selected detention session and open any student to inspect their history."}
+          : "Review the selected detention and open any student to inspect their history."}
       </p>
       <select
         style={inputStyle}
         value={selectedSessionId}
         onChange={(e) => setSelectedSessionId(e.target.value)}
       >
-        <option value="">Select session</option>
+        <option value="">Select detention</option>
         {sessions.map((session) => (
           <option key={session.id} value={session.id}>
             {session.name} - {session.date}
@@ -741,7 +741,7 @@ export default function SessionRollCard({
                 onChange={(e) =>
                   setSessionForm((prev) => ({ ...prev, name: e.target.value }))
                 }
-                placeholder="Session name"
+                placeholder="Detention name"
               />
               <input
                 style={inputStyle}
@@ -790,7 +790,7 @@ export default function SessionRollCard({
                     }
                   }}
                 >
-                  {sessionSaving ? "Saving..." : "Save session"}
+                  {sessionSaving ? "Saving..." : "Save detention"}
                 </button>
                 <button
                   type="button"
@@ -859,7 +859,7 @@ export default function SessionRollCard({
                     style={smallButtonStyle}
                     onClick={startEditingSession}
                   >
-                    Edit session
+                    Edit detention
                   </button>
                   <button
                     type="button"
@@ -870,7 +870,7 @@ export default function SessionRollCard({
                     }}
                     onClick={() => onDeleteSession(selectedSession.id)}
                   >
-                    Delete session
+                    Delete detention
                   </button>
                 </div>
               ) : null}
@@ -911,7 +911,7 @@ export default function SessionRollCard({
         </div>
       ) : null}
       {orderedSessionEntries.length === 0 ? (
-        <p>No students assigned to this session yet.</p>
+        <p>No students assigned to this detention yet.</p>
       ) : (
         <>
         {isSupervisor ? (
@@ -1062,7 +1062,7 @@ export default function SessionRollCard({
                     setEntryForm((prev) => ({ ...prev, session_id: e.target.value }))
                   }
                 >
-                  <option value="">Select session</option>
+                  <option value="">Select detention</option>
                   {sessions.map((session) => (
                     <option key={session.id} value={session.id}>
                       {session.name} - {session.date}

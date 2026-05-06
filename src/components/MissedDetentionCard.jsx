@@ -46,7 +46,7 @@ export default function MissedDetentionCard({
     <div style={cardStyle}>
       <h2 style={sectionTitleStyle}>Missed Detention</h2>
       <p style={sectionCopyStyle}>
-        Review students marked absent from detention, move them into a new session,
+        Review students marked absent from detention, move them into a new detention,
         or remove the entry entirely.
       </p>
       {missedEntries.length === 0 ? (
@@ -97,7 +97,7 @@ export default function MissedDetentionCard({
                 Year {entry.year_level || "-"} · {entry.homegroup || "-"}
               </div>
               <div style={{ color: "#17334b", fontSize: 14, marginBottom: 4 }}>
-                Session: {entry.session_name || "-"} · {formatDisplayDate(entry.session_date)} ·{" "}
+                Detention: {entry.session_name || "-"} · {formatDisplayDate(entry.session_date)} ·{" "}
                 {entry.session_time || "-"}
               </div>
               <div style={{ color: "#4b587c", fontSize: 14 }}>
@@ -111,7 +111,7 @@ export default function MissedDetentionCard({
                     value={moveSessionId}
                     onChange={(event) => setMoveSessionId(event.target.value)}
                   >
-                    <option value="">Select new session</option>
+                    <option value="">Select new detention</option>
                     {sessions
                       .filter((session) => session.id !== entry.session_id)
                       .map((session) => (
@@ -130,7 +130,7 @@ export default function MissedDetentionCard({
                         handleMoveEntry(entry);
                       }}
                     >
-                      {entrySavingId === entry.id ? "Saving..." : "Move to session"}
+                      {entrySavingId === entry.id ? "Saving..." : "Move to detention"}
                     </button>
                     <button
                       type="button"

@@ -114,45 +114,43 @@ export default function DashboardHome({
       {isMobile ? null : <DashboardStats stats={stats} />}
 
       {showYearFilters ? (
-        <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Dashboard Years</h2>
-          <p style={sectionCopyStyle}>
-            Choose one or more year levels to filter the dashboard, or leave all years selected.
-          </p>
-          <div
-            style={
-              isMobile
-                ? mobileNavBarStyle
-                : { display: "flex", gap: 10, flexWrap: "wrap" }
-            }
-          >
-            <button
-              type="button"
-              style={{
-                ...(isMobile ? mobileNavButtonStyle : navButtonStyle),
-                ...(selectedYearLevels.length === 0 ? navButtonActiveStyle : {}),
-              }}
-              onClick={onClearYearLevels}
+        <div style={mobileTwoColStyle}>
+          <div style={{ ...cardStyle, maxWidth: "none", gridColumn: "1 / -1" }}>
+            <div
+              style={
+                isMobile
+                  ? mobileNavBarStyle
+                  : { display: "flex", gap: 10, flexWrap: "wrap" }
+              }
             >
-              All years
-            </button>
-            {availableYearLevels.map((yearLevel) => {
-              const selected = selectedYearLevels.includes(yearLevel);
+              <button
+                type="button"
+                style={{
+                  ...(isMobile ? mobileNavButtonStyle : navButtonStyle),
+                  ...(selectedYearLevels.length === 0 ? navButtonActiveStyle : {}),
+                }}
+                onClick={onClearYearLevels}
+              >
+                All years
+              </button>
+              {availableYearLevels.map((yearLevel) => {
+                const selected = selectedYearLevels.includes(yearLevel);
 
-              return (
-                <button
-                  key={yearLevel}
-                  type="button"
-                  style={{
-                    ...(isMobile ? mobileNavButtonStyle : navButtonStyle),
-                    ...(selected ? navButtonActiveStyle : {}),
-                  }}
-                  onClick={() => onToggleYearLevel(yearLevel)}
-                >
-                  Year {yearLevel}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={yearLevel}
+                    type="button"
+                    style={{
+                      ...(isMobile ? mobileNavButtonStyle : navButtonStyle),
+                      ...(selected ? navButtonActiveStyle : {}),
+                    }}
+                    onClick={() => onToggleYearLevel(yearLevel)}
+                  >
+                    Year {yearLevel}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       ) : null}

@@ -288,7 +288,7 @@ export default function AttendanceImportCard({
                 value={attendanceSessionId}
                 onChange={(e) => setAttendanceSessionId(e.target.value)}
               >
-                <option value="">Choose detention session</option>
+                <option value="">Choose detention</option>
                 {sessions.map((session) => (
                   <option key={session.id} value={session.id}>
                     {session.name} - {session.date}
@@ -452,7 +452,7 @@ export default function AttendanceImportCard({
                                     assignAttendanceGroupToSession(group);
                                   }}
                                 >
-                                  {status.assigned ? "Already assigned" : "Assign to session"}
+                                  {status.assigned ? "Already assigned" : "Assign to detention"}
                                 </button>
                               ) : null}
                             </div>

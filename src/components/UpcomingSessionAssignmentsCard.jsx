@@ -12,16 +12,16 @@ export default function UpcomingSessionAssignmentsCard({
 }) {
   return (
     <div style={cardStyle}>
-      <h2 style={sectionTitleStyle}>Upcoming Detention Session</h2>
+      <h2 style={sectionTitleStyle}>Upcoming Detention</h2>
       <p style={sectionCopyStyle}>
         {upcomingSession
           ? `Students already assigned to ${upcomingSession.name} on ${upcomingSession.date}.`
-          : "No upcoming detention session is scheduled yet."}
+          : "No upcoming detention is scheduled yet."}
       </p>
       {!upcomingSession ? (
-        <p>Create a future session to see assigned students here.</p>
+        <p>Create a future detention to see assigned students here.</p>
       ) : assignedStudents.length === 0 ? (
-        <p>No students assigned to the upcoming detention session yet.</p>
+        <p>No students assigned to the upcoming detention yet.</p>
       ) : (
         assignedStudents.map((student) => (
           <div

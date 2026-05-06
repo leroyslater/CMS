@@ -33,9 +33,9 @@ export default function AddStudentCard({
 }) {
   return (
     <div style={cardStyle}>
-      <h2 style={sectionTitleStyle}>Add Student to Session</h2>
+      <h2 style={sectionTitleStyle}>Add Student to Detention</h2>
       <p style={sectionCopyStyle}>
-        Search the student roster, select the target session, then record the reason.
+        Search the student roster, select the target detention, then record the reason.
       </p>
       <form onSubmit={handleAddEntry}>
         <select
@@ -43,7 +43,7 @@ export default function AddStudentCard({
           value={newEntry.sessionId}
           onChange={(e) => setNewEntry({ ...newEntry, sessionId: e.target.value })}
         >
-          <option value="">Select session</option>
+          <option value="">Select detention</option>
           {sessions.map((session) => (
             <option key={session.id} value={session.id}>
               {session.name} - {session.date}

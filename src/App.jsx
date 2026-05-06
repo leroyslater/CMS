@@ -20,11 +20,6 @@ import { useDetentionData } from "./hooks/useDetentionData";
 import { fetchTableRows, upsertTableRows } from "./lib/supabaseRest";
 import { supabase } from "./lib/supabaseClient";
 import {
-  mobileNavBarStyle,
-  mobileNavButtonStyle,
-  navBarStyle,
-  navButtonActiveStyle,
-  navButtonStyle,
   pageStyle,
   statusErrorStyle,
   statusSuccessStyle,
@@ -113,9 +108,6 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [activePage, setActivePage] = useState("dashboard");
   const [dashboardYearFilter, setDashboardYearFilter] = useState([]);
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" ? window.innerWidth <= 768 : false
-  );
   const error = authError || dataError;
   const currentEntry = newEntry.sessionId
     ? newEntry
@@ -154,11 +146,11 @@ export default function App() {
     () =>
       isSupervisor
         ? [
-            { id: "sessions", label: "Sessions" },
+            { id: "sessions", label: "Detentions" },
           ]
         : [
             { id: "dashboard", label: "Dashboard" },
-            { id: "sessions", label: "Sessions" },
+            { id: "sessions", label: "Detentions" },
             { id: "supervisor", label: "Supervisor" },
             { id: "chronicle", label: "Chronicle" },
             { id: "attendance", label: "Attendance" },
@@ -183,18 +175,6 @@ export default function App() {
     if (!authSession || passwordRecoveryMode) return;
     setActivePage(isSupervisor ? "sessions" : "dashboard");
   }, [authSession, isSupervisor, passwordRecoveryMode]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-
-    function updateIsMobile() {
-      setIsMobile(window.innerWidth <= 768);
-    }
-
-    updateIsMobile();
-    window.addEventListener("resize", updateIsMobile);
-    return () => window.removeEventListener("resize", updateIsMobile);
-  }, []);
 
   function clearError() {
     setAuthError("");
@@ -471,7 +451,7 @@ export default function App() {
     if (data?.[0]) {
       prependSession(data[0]);
       setNewEntry((prev) => ({ ...prev, sessionId: data[0].id }));
-      setMessage("Session created.");
+      setMessage("Detention created.");
     }
 
     setNewSession(resetNewSession());
@@ -493,7 +473,7 @@ export default function App() {
       !currentEntry.issuedBy
     ) {
       setDataError(
-        "Select a session, choose a student, add a reason, and enter who issued the detention."
+        "Select a detention, choose a student, add a reason, and enter who issued the detention."
       );
       return;
     }
@@ -690,7 +670,7 @@ export default function App() {
       const result = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setDataError(result?.error || "Failed to submit the session roll.");
+        setDataError(result?.error || "Failed to submit the detention roll.");
         return;
       }
 
@@ -719,7 +699,7 @@ export default function App() {
       }
 
       replaceSession(sessionId, updates);
-      setMessage("Session updated.");
+      setMessage("Detention updated.");
       return true;
     } finally {
       setSessionSaving(false);
@@ -728,7 +708,7 @@ export default function App() {
 
   async function handleDeleteSession(sessionId) {
     const confirmed = window.confirm(
-      "Delete this session and all students assigned to it?"
+      "Delete this detention and all students assigned to it?"
     );
     if (!confirmed) return;
 
@@ -739,7 +719,7 @@ export default function App() {
     try {
       const accessToken = authSession?.access_token;
       if (!accessToken) {
-        setDataError("You need to be signed in before deleting sessions.");
+        setDataError("You need to be signed in before deleting detentions.");
         return;
       }
 
@@ -755,7 +735,7 @@ export default function App() {
       const result = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setDataError(result?.error || "Failed to delete session.");
+        setDataError(result?.error || "Failed to delete detention.");
         return;
       }
 
@@ -767,7 +747,7 @@ export default function App() {
             .map((entry) => entry.id);
       deletedEntryIds.forEach((entryId) => removeEntry(entryId));
       await loadData();
-      setMessage("Session deleted.");
+      setMessage("Detention deleted.");
     } finally {
       setSessionSaving(false);
     }
@@ -790,7 +770,7 @@ export default function App() {
       }
 
       replaceEntry(entryId, updates);
-      setMessage("Student updated in session roll.");
+      setMessage("Student updated in detention roll.");
       return true;
     } finally {
       setEntrySavingId(null);
@@ -808,7 +788,7 @@ export default function App() {
     }
 
     const confirmed = window.confirm(
-      "Remove this student from the selected session?"
+      "Remove this student from the selected detention?"
     );
     if (!confirmed) return;
 
@@ -836,7 +816,7 @@ export default function App() {
 
       const accessToken = authSession?.access_token;
       if (!accessToken) {
-        setDataError("You need to be signed in before removing students from sessions.");
+        setDataError("You need to be signed in before removing students from detentions.");
         return;
       }
 
@@ -852,7 +832,7 @@ export default function App() {
       const result = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setDataError(result?.error || "Failed to remove student from session.");
+        setDataError(result?.error || "Failed to remove student from detention.");
         return;
       }
 
@@ -862,7 +842,7 @@ export default function App() {
 
       deletedIds.forEach((id) => removeEntry(id));
       await loadData();
-      setMessage("Student removed from session roll.");
+      setMessage("Student removed from detention roll.");
     } finally {
       setEntrySavingId(null);
     }
@@ -2345,6 +2325,9 @@ export default function App() {
         handleLogout={handleLogout}
         onOpenAccount={() => setActivePage("account")}
         accountActive={activePage === "account"}
+        pages={!isSupervisor ? pages : []}
+        activePage={activePage}
+        onSelectPage={setActivePage}
       />
 
       {error ? <p style={statusErrorStyle}>{error}</p> : null}
@@ -2366,42 +2349,6 @@ export default function App() {
         />
       ) : (
         <>
-          {!isSupervisor ? (
-            isMobile ? (
-              <div style={mobileNavBarStyle}>
-                {pages.map((page) => (
-                  <button
-                    key={page.id}
-                    type="button"
-                    style={{
-                      ...mobileNavButtonStyle,
-                      ...(activePage === page.id ? navButtonActiveStyle : {}),
-                    }}
-                    onClick={() => setActivePage(page.id)}
-                  >
-                    {page.label}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div style={navBarStyle}>
-                {pages.map((page) => (
-                  <button
-                    key={page.id}
-                    type="button"
-                    style={{
-                      ...navButtonStyle,
-                      ...(activePage === page.id ? navButtonActiveStyle : {}),
-                    }}
-                    onClick={() => setActivePage(page.id)}
-                  >
-                    {page.label}
-                  </button>
-                ))}
-              </div>
-            )
-          ) : null}
-
           {activePage === "dashboard" ? (
             <DashboardHome
               stats={dashboardStats}

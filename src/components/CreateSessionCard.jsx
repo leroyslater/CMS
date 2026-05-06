@@ -13,14 +13,14 @@ export default function CreateSessionCard({
 }) {
   return (
     <div style={cardStyle}>
-      <h2 style={sectionTitleStyle}>Create Session</h2>
+      <h2 style={sectionTitleStyle}>Create Detention</h2>
       <p style={sectionCopyStyle}>
         Add the next detention slot with a clear time and location.
       </p>
       <form onSubmit={handleCreateSession}>
         <input
           style={inputStyle}
-          placeholder="Session name"
+          placeholder="Detention name"
           value={newSession.name}
           onChange={(e) => setNewSession({ ...newSession, name: e.target.value })}
         />
@@ -45,7 +45,7 @@ export default function CreateSessionCard({
           }
         />
         <button style={buttonStyle} type="submit">
-          Create Session
+          Create Detention
         </button>
       </form>
     </div>
