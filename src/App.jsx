@@ -27,6 +27,8 @@ import {
 } from "./styles/uiStyles";
 
 const todayString = new Date().toISOString().slice(0, 10);
+const FIXED_YEAR_LEVEL_OPTIONS = ["7", "8", "9", "10"];
+
 export default function App() {
   const {
     authSession,
@@ -118,17 +120,7 @@ export default function App() {
     () => normalizeYearLevels(profile?.year_levels ?? profile?.year_level),
     [profile]
   );
-  const availableDashboardYearLevels = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          students
-            .map((student) => String(student.year_level || "").trim())
-            .filter(Boolean)
-        )
-      ).sort((a, b) => Number(a) - Number(b) || a.localeCompare(b)),
-    [students]
-  );
+  const availableDashboardYearLevels = FIXED_YEAR_LEVEL_OPTIONS;
   const dashboardYearLevels = useMemo(
     () => normalizeYearLevels(dashboardYearFilter),
     [dashboardYearFilter]
@@ -1496,21 +1488,9 @@ export default function App() {
     attendanceYearLevels,
   ]);
 
-  const chronicleYearOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(chronicleGrouped.map((g) => g.yearLevel).filter(Boolean))
-      ).sort(),
-    [chronicleGrouped]
-  );
+  const chronicleYearOptions = FIXED_YEAR_LEVEL_OPTIONS;
 
-  const attendanceYearOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(attendancePageGrouped.map((group) => group.yearLevel).filter(Boolean))
-      ).sort(),
-    [attendancePageGrouped]
-  );
+  const attendanceYearOptions = FIXED_YEAR_LEVEL_OPTIONS;
 
   const selectedChronicleGroup = useMemo(
     () => chronicleGrouped.find((g) => g.key === selectedChronicleKey) || null,

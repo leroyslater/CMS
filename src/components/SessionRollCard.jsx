@@ -796,9 +796,6 @@ export default function SessionRollCard({
                   {selectedSession.location || "-"}
                 </div>
                 <div style={{ marginTop: 4, color: "#4b587c" }}>
-                  Supervisor: {selectedSession.supervisor || "-"}
-                </div>
-                <div style={{ marginTop: 4, color: "#4b587c" }}>
                   Students: {selectedSessionEntries.length}
                 </div>
               </div>
@@ -954,48 +951,69 @@ export default function SessionRollCard({
               style={{
                 display: "flex",
                 gap: 12,
-                alignItems: "baseline",
+                alignItems: "center",
+                justifyContent: "space-between",
                 marginBottom: 4,
                 flexWrap: "wrap",
               }}
             >
-              <strong>{entry.student_name}</strong>
-              <span style={{ color: "#4b587c", fontSize: 13 }}>
-                Year {entry.year_level || "-"} · {entry.homegroup || "-"}
-              </span>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                alignItems: "center",
-                flexWrap: "wrap",
-                color: "#4b587c",
-                fontSize: 14,
-              }}
-            >
-              <span style={{ minWidth: 0, flex: "1 1 260px" }}>
-                Reason: {entry.reason || "-"}
-              </span>
-              <span
+              <div
                 style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  padding: "4px 9px",
-                  borderRadius: 999,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: isPresent ? "#14532d" : isAbsent ? "#8a1f1f" : "#4b587c",
-                  background: isPresent ? "#dcfce7" : isAbsent ? "#ffeaea" : "#eef3f7",
-                  border: isPresent
-                    ? "1px solid #86efac"
-                    : isAbsent
-                      ? "1px solid #f1b0b0"
-                      : "1px solid #c8d8e1",
+                  display: "flex",
+                  gap: 12,
+                  alignItems: "baseline",
+                  flexWrap: "wrap",
+                  minWidth: 0,
+                  flex: "1 1 320px",
                 }}
               >
-                {attendanceStatus}
-              </span>
+                <strong>{entry.student_name}</strong>
+                <span style={{ color: "#4b587c", fontSize: 13 }}>
+                  Year {entry.year_level || "-"} · {entry.homegroup || "-"} ·{" "}
+                  {formatDetentionReasonLabel(entry.reason)}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  justifyContent: "flex-end",
+                }}
+              >
+                {isSupervisor || editingEntryId === entry.id ? null : (
+                  <>
+                    <button
+                      type="button"
+                      style={{
+                        ...smallButtonStyle,
+                        border: "1px solid #9fb6c7",
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEditingEntry(entry);
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      style={{
+                        ...smallButtonStyle,
+                        border: "1px solid #d9a79a",
+                        color: "#8b2f1b",
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteEntry(entry);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
             {isSupervisor ? (
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
@@ -1097,34 +1115,7 @@ export default function SessionRollCard({
                   </button>
                 </div>
               </div>
-            ) : (
-              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  style={smallButtonStyle}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    startEditingEntry(entry);
-                  }}
-                >
-                  Edit or move
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    ...smallButtonStyle,
-                    border: "1px solid #d9a79a",
-                    color: "#8b2f1b",
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteEntry(entry);
-                  }}
-                >
-                  Delete student
-                </button>
-              </div>
-            )}
+            ) : null}
           </div>
           );
         })}
@@ -1168,6 +1159,25 @@ function renderReasonChecklist() {
       </div>
     `;
   }).join("");
+}
+
+function formatDetentionReasonLabel(reason) {
+  const value = String(reason || "").trim();
+  const normalized = value.toLowerCase();
+
+  if (!value) {
+    return "-";
+  }
+
+  if (normalized.includes("attendance")) {
+    return "Attendance";
+  }
+
+  if (normalized.includes("chronicle")) {
+    return "Chronicle";
+  }
+
+  return value;
 }
 
 function matchesActivityReason(reason, activityType) {

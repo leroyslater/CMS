@@ -76,34 +76,53 @@ export default function MissedDetentionCard({
                   marginBottom: 4,
                 }}
               >
-                <strong>{entry.student_name}</strong>
-                <span
+                <div
                   style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    padding: "4px 9px",
-                    borderRadius: 999,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: "#8a1f1f",
-                    background: "#ffeaea",
-                    border: "1px solid #f1b0b0",
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "baseline",
+                    flexWrap: "wrap",
                   }}
                 >
-                  Missed detention
-                </span>
+                  <strong>{entry.student_name}</strong>
+                  <span style={{ color: "#4b587c", fontSize: 13 }}>
+                    Year {entry.year_level || "-"} · {entry.homegroup || "-"} ·{" "}
+                    {entry.session_name || "-"} · {formatDisplayDate(entry.session_date)} ·{" "}
+                    {entry.session_time || "-"} · {formatDetentionReasonLabel(entry.reason)}
+                  </span>
+                </div>
+                {isMoving ? null : (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      style={{
+                        ...smallButtonStyle,
+                        border: "1px solid #9fb6c7",
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        startMovingEntry(entry);
+                      }}
+                    >
+                      Move
+                    </button>
+                    <button
+                      type="button"
+                      style={{
+                        ...smallButtonStyle,
+                        border: "1px solid #d9a79a",
+                        color: "#8b2f1b",
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDeleteEntry(entry);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
               </div>
-              <div style={{ color: "#4b587c", fontSize: 14, marginBottom: 4 }}>
-                Year {entry.year_level || "-"} · {entry.homegroup || "-"}
-              </div>
-              <div style={{ color: "#17334b", fontSize: 14, marginBottom: 4 }}>
-                Detention: {entry.session_name || "-"} · {formatDisplayDate(entry.session_date)} ·{" "}
-                {entry.session_time || "-"}
-              </div>
-              <div style={{ color: "#4b587c", fontSize: 14 }}>
-                Reason: {entry.reason || "-"}
-              </div>
-
               {isMoving ? (
                 <div style={{ marginTop: 10 }}>
                   <select
@@ -145,34 +164,7 @@ export default function MissedDetentionCard({
                     </button>
                   </div>
                 </div>
-              ) : (
-                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    style={smallButtonStyle}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      startMovingEntry(entry);
-                    }}
-                  >
-                    Move
-                  </button>
-                  <button
-                    type="button"
-                    style={{
-                      ...smallButtonStyle,
-                      border: "1px solid #d9a79a",
-                      color: "#8b2f1b",
-                    }}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onDeleteEntry(entry);
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              )}
+              ) : null}
             </div>
           );
         })
@@ -193,4 +185,23 @@ function formatDisplayDate(value) {
     month: "long",
     year: "numeric",
   }).format(date);
+}
+
+function formatDetentionReasonLabel(reason) {
+  const value = String(reason || "").trim();
+  const normalized = value.toLowerCase();
+
+  if (!value) {
+    return "-";
+  }
+
+  if (normalized.includes("attendance")) {
+    return "Attendance";
+  }
+
+  if (normalized.includes("chronicle")) {
+    return "Chronicle";
+  }
+
+  return value;
 }
