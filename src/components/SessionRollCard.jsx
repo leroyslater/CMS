@@ -522,16 +522,6 @@ export default function SessionRollCard({
                       (prompt, promptIndex) => `
                         <div class="prompt-block">
                           <div class="prompt-title">${pageIndex * 2 + promptIndex + 1}. ${escapeHtml(prompt)}</div>
-                          <div class="response-lines">
-                            <div class="line"></div>
-                            <div class="line"></div>
-                            <div class="line"></div>
-                            <div class="line"></div>
-                            <div class="line"></div>
-                            <div class="line"></div>
-                            <div class="line"></div>
-                            <div class="line"></div>
-                          </div>
                         </div>
                       `
                     )
@@ -679,19 +669,7 @@ export default function SessionRollCard({
             .prompt-title {
               font-weight: 700;
               color: #071c74;
-              margin-bottom: 8px;
               font-size: 14px;
-            }
-            .response-lines {
-              display: flex;
-              flex-direction: column;
-              gap: 8px;
-              flex: 1;
-              min-height: 0;
-            }
-            .line {
-              border-bottom: 1px solid rgba(7, 28, 116, 0.6);
-              min-height: 14px;
             }
             @media print {
               body {
