@@ -454,18 +454,18 @@ export default function App() {
     clearError();
     setMessage("");
 
+    const issuedBy =
+      String(profile?.full_name || "").trim() ||
+      String(profile?.email || "").trim() ||
+      String(authSession?.user?.email || "").trim();
+
     const selectedStudentRecord = students.find(
       (student) => student.id === currentEntry.studentId
     );
 
-    if (
-      !currentEntry.sessionId ||
-      !selectedStudentRecord ||
-      !currentEntry.reason ||
-      !currentEntry.issuedBy
-    ) {
+    if (!currentEntry.sessionId || !selectedStudentRecord || !currentEntry.reason) {
       setDataError(
-        "Select a detention, choose a student, add a reason, and enter who issued the detention."
+        "Select a detention, choose a student, and add a reason."
       );
       return;
     }
@@ -476,7 +476,7 @@ export default function App() {
       year_level: selectedStudentRecord.year_level,
       homegroup: selectedStudentRecord.homegroup,
       reason: currentEntry.reason,
-      issued_by: currentEntry.issuedBy,
+      issued_by: issuedBy || "Signed-in user",
       attendance: "Unmarked",
     };
 
@@ -2012,10 +2012,17 @@ export default function App() {
       .filter((entry) => !shouldScopeDashboardByYear || dashboardStudentNames.has(entry.student_name))
       .map((entry) => ({
         name: entry.student_name,
+        homegroup:
+          entry.homegroup ||
+          students.find(
+            (student) =>
+              `${student.first_name} ${student.last_name}`.trim() === entry.student_name
+          )?.homegroup ||
+          "",
         reason: entry.reason,
       }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [dashboardStudentNames, entries, upcomingSession, shouldScopeDashboardByYear]);
+      .sort(compareStudentsByHomegroupThenName);
+  }, [dashboardStudentNames, entries, students, upcomingSession, shouldScopeDashboardByYear]);
 
   const dashboardStudentCount = shouldScopeDashboardByYear
     ? dashboardStudents.length
@@ -2029,14 +2036,14 @@ export default function App() {
         note: "Roster available to assign",
       },
       {
-        label: "Sessions",
-        value: sessions.length,
-        note: "Detention slots currently open",
-      },
-      {
         label: "Entries",
         value: entries.length,
         note: "Assigned detention records",
+      },
+      {
+        label: "Chronicles",
+        value: dashboardChronicleRows.length,
+        note: "Chronicle incidents imported",
       },
       {
         label: "Upcoming Assigned",
@@ -2053,8 +2060,8 @@ export default function App() {
     ],
     [
       dashboardStudentCount,
-      sessions.length,
       entries.length,
+      dashboardChronicleRows.length,
       upcomingSessionAssignments.length,
       upcomingSession,
       dashboardAttendanceRows.length,
@@ -2065,12 +2072,24 @@ export default function App() {
     const counts = {};
     dashboardChronicleRows.forEach((row) => {
       if (!row.studentName) return;
-      counts[row.studentName] = (counts[row.studentName] || 0) + 1;
+      if (!counts[row.studentName]) {
+        counts[row.studentName] = {
+          count: 0,
+          homegroup: row.homegroup || "",
+        };
+      }
+      counts[row.studentName].count += 1;
+      if (!counts[row.studentName].homegroup && row.homegroup) {
+        counts[row.studentName].homegroup = row.homegroup;
+      }
     });
 
     return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+      .map(([name, data]) => ({ name, count: data.count, homegroup: data.homegroup }))
+      .sort(
+        (a, b) =>
+          b.count - a.count || compareStudentsByHomegroupThenName(a, b)
+      )
       .slice(0, 5);
   }, [dashboardChronicleRows]);
 
@@ -2083,7 +2102,7 @@ export default function App() {
       }
 
       const teacherName = String(row.originalPublisher || "").trim();
-      if (!teacherName) return;
+      if (!teacherName || teacherName.toLowerCase() === "replacement teacher") return;
 
       counts[teacherName] = (counts[teacherName] || 0) + 1;
     });
@@ -2091,7 +2110,7 @@ export default function App() {
     return Object.entries(counts)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-      .slice(0, 8);
+      .slice(0, 10);
   }, [dashboardChronicleRows]);
 
   const chronicleTwoPlusThisWeek = useMemo(
@@ -2105,7 +2124,14 @@ export default function App() {
           isGroupInCurrentSchoolWeek(group.rows, "occurredDate", currentWeekEndingKey)
         )
         .filter((group) => group.count >= 2)
-        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+        .sort(
+          (a, b) =>
+            b.count - a.count ||
+            compareStudentsByHomegroupThenName(
+              { name: a.studentName, homegroup: a.homegroup },
+              { name: b.studentName, homegroup: b.homegroup }
+            )
+        )
         .slice(0, 8)
         .map((group) => ({
           key: group.key,
@@ -2127,14 +2153,30 @@ export default function App() {
             return counts;
           }
           if (entry.student_name) {
-            counts[entry.student_name] = (counts[entry.student_name] || 0) + 1;
+            if (!counts[entry.student_name]) {
+              counts[entry.student_name] = {
+                count: 0,
+                homegroup: entry.homegroup || "",
+              };
+            }
+            counts[entry.student_name].count += 1;
+            if (!counts[entry.student_name].homegroup && entry.homegroup) {
+              counts[entry.student_name].homegroup = entry.homegroup;
+            }
           }
           return counts;
         }, {})
       )
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-      .slice(0, 5),
+        .map(([name, data]) => ({
+          name,
+          count: data.count,
+          homegroup: data.homegroup,
+        }))
+        .sort(
+          (a, b) =>
+            b.count - a.count || compareStudentsByHomegroupThenName(a, b)
+        )
+        .slice(0, 5),
     [dashboardStudentNames, entries, shouldScopeDashboardByYear]
   );
 
@@ -2163,13 +2205,7 @@ export default function App() {
     });
 
     return Object.values(grouped)
-      .sort(
-        (a, b) =>
-          Number(a.yearLevel || 0) - Number(b.yearLevel || 0) ||
-          String(a.yearLevel || "").localeCompare(String(b.yearLevel || "")) ||
-          String(a.homegroup || "").localeCompare(String(b.homegroup || "")) ||
-          a.name.localeCompare(b.name)
-      )
+      .sort(compareStudentsByHomegroupThenName)
       .slice(0, 8);
   }, [dashboardStudentNames, entries, shouldScopeDashboardByYear]);
 
@@ -2177,12 +2213,24 @@ export default function App() {
     const counts = {};
     dashboardAttendanceRows.forEach((row) => {
       if (!row.studentName) return;
-      counts[row.studentName] = (counts[row.studentName] || 0) + 1;
+      if (!counts[row.studentName]) {
+        counts[row.studentName] = {
+          count: 0,
+          homegroup: row.homegroup || "",
+        };
+      }
+      counts[row.studentName].count += 1;
+      if (!counts[row.studentName].homegroup && row.homegroup) {
+        counts[row.studentName].homegroup = row.homegroup;
+      }
     });
 
     return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+      .map(([name, data]) => ({ name, count: data.count, homegroup: data.homegroup }))
+      .sort(
+        (a, b) =>
+          b.count - a.count || compareStudentsByHomegroupThenName(a, b)
+      )
       .slice(0, 5);
   }, [dashboardAttendanceRows]);
 
@@ -2250,7 +2298,14 @@ export default function App() {
         isGroupInCurrentSchoolWeek(group.rows, "startAtDate", currentWeekEndingKey)
       )
       .filter((group) => group.count >= 2)
-      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+      .sort(
+        (a, b) =>
+          b.count - a.count ||
+          compareStudentsByHomegroupThenName(
+            { name: a.studentName, homegroup: a.homegroup },
+            { name: b.studentName, homegroup: b.homegroup }
+          )
+      )
       .slice(0, 8)
       .map((group) => ({
         key: group.key,
@@ -2403,8 +2458,6 @@ export default function App() {
 
           {activePage === "sessions" ? (
             <>
-              <DashboardStats stats={dashboardStats} />
-
               <div style={twoColStyle}>
                 <CreateSessionCard
                   newSession={newSession}
@@ -2668,6 +2721,13 @@ function normalizeYearLevels(value) {
   }
 
   return [String(value).trim()].filter(Boolean);
+}
+
+function compareStudentsByHomegroupThenName(a, b) {
+  return (
+    String(a.homegroup || "").localeCompare(String(b.homegroup || "")) ||
+    String(a.name || "").localeCompare(String(b.name || ""))
+  );
 }
 
 function getStudentAttendancePercentageValue(record) {

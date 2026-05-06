@@ -690,7 +690,9 @@ export default function SessionRollCard({
   }
 
   return (
-    <div style={cardStyle}>
+    <div
+      style={{ ...cardStyle, maxWidth: "none", width: "100%", boxSizing: "border-box" }}
+    >
       <h2 style={sectionTitleStyle}>Detention Roll</h2>
       <p style={sectionCopyStyle}>
         {isSupervisor
@@ -968,7 +970,7 @@ export default function SessionRollCard({
                 }}
               >
                 <strong>{entry.student_name}</strong>
-                <span style={{ color: "#4b587c", fontSize: 13 }}>
+                <span style={{ color: "#4b587c", fontSize: 14 }}>
                   Year {entry.year_level || "-"} · {entry.homegroup || "-"} ·{" "}
                   {formatDetentionReasonLabel(entry.reason)}
                 </span>

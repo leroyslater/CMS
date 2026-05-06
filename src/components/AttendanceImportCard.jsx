@@ -172,9 +172,9 @@ export default function AttendanceImportCard({
   return (
     <>
       <div style={cardStyle}>
-        <h2 style={sectionTitleStyle}>Attendance Compass Sync</h2>
+        <h2 style={sectionTitleStyle}>Attendance Sync</h2>
         <p style={sectionCopyStyle}>
-          Sync school-late and class-late attendance directly from Compass. If no attendance has been saved yet, the sync starts from 1 January of the current year. After that, it uses the latest saved attendance timestamp to speed up repeat syncs.
+          Sync attendance directly from Compass, or use a CSV upload as a fallback. If no attendance has been saved yet, the sync starts from 1 January of the current year. After that, it uses the latest saved attendance timestamp to speed up repeat syncs.
         </p>
         <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
           <button
@@ -186,10 +186,9 @@ export default function AttendanceImportCard({
             {attendanceSyncing ? "Syncing..." : "Sync from Compass"}
           </button>
         </div>
-      </div>
-
-      <div style={cardStyle}>
-        <h2 style={sectionTitleStyle}>Attendance CSV Import</h2>
+        <p style={{ ...sectionCopyStyle, marginTop: 14 }}>
+          CSV fallback
+        </p>
         <p style={sectionCopyStyle}>
           Upload the attendance CSV report to load both school-late and class-late records. A real
           arrival time counts as school late. `-` in arrival time counts as class late.

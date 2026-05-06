@@ -140,7 +140,6 @@ export function useDetentionData(authSession, todayString) {
       yearLevel: "",
       homegroup: "",
       reason: "",
-      issuedBy: "",
     };
   }
 

@@ -14,7 +14,9 @@ export default function StudentHistoryCard({
   }
 
   return (
-    <div style={cardStyle}>
+    <div
+      style={{ ...cardStyle, maxWidth: "none", width: "100%", boxSizing: "border-box" }}
+    >
       <h2 style={sectionTitleStyle}>Student History</h2>
       <p style={sectionCopyStyle}>
         A quick timeline of detention records for the selected student.

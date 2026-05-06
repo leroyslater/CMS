@@ -32,10 +32,12 @@ export default function AddStudentCard({
   filteredStudents,
 }) {
   return (
-    <div style={cardStyle}>
+    <div
+      style={{ ...cardStyle, maxWidth: "none", width: "100%", boxSizing: "border-box" }}
+    >
       <h2 style={sectionTitleStyle}>Add Student to Detention</h2>
       <p style={sectionCopyStyle}>
-        Search the student roster, select the target detention, then record the reason.
+        Search the student roster, select the target detention, then record the reason. The detention will be issued under your signed-in account.
       </p>
       <form onSubmit={handleAddEntry}>
         <select
@@ -108,12 +110,6 @@ export default function AddStudentCard({
           placeholder="Reason"
           value={newEntry.reason}
           onChange={(e) => setNewEntry({ ...newEntry, reason: e.target.value })}
-        />
-        <input
-          style={inputStyle}
-          placeholder="Issued by"
-          value={newEntry.issuedBy}
-          onChange={(e) => setNewEntry({ ...newEntry, issuedBy: e.target.value })}
         />
         <button style={buttonStyle} type="submit">
           Add Student

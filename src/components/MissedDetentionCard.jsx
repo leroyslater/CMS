@@ -43,7 +43,9 @@ export default function MissedDetentionCard({
   }
 
   return (
-    <div style={cardStyle}>
+    <div
+      style={{ ...cardStyle, maxWidth: "none", width: "100%", boxSizing: "border-box" }}
+    >
       <h2 style={sectionTitleStyle}>Missed Detention</h2>
       <p style={sectionCopyStyle}>
         Review students marked absent from detention, move them into a new detention,
@@ -85,10 +87,10 @@ export default function MissedDetentionCard({
                   }}
                 >
                   <strong>{entry.student_name}</strong>
-                  <span style={{ color: "#4b587c", fontSize: 13 }}>
-                    Year {entry.year_level || "-"} · {entry.homegroup || "-"} ·{" "}
-                    {entry.session_name || "-"} · {formatDisplayDate(entry.session_date)} ·{" "}
-                    {entry.session_time || "-"} · {formatDetentionReasonLabel(entry.reason)}
+                  <span style={{ color: "#4b587c", fontSize: 14 }}>
+                    {entry.homegroup || "-"} · {entry.session_name || "-"} ·{" "}
+                    {formatDisplayDate(entry.session_date)} · {entry.session_time || "-"} ·{" "}
+                    {formatDetentionReasonLabel(entry.reason)}
                   </span>
                 </div>
                 {isMoving ? null : (

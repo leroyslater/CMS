@@ -29,11 +29,41 @@ export default function UpcomingSessionAssignmentsCard({
             style={{ ...entryCardStyle, cursor: "pointer" }}
             onClick={() => setSelectedStudent(student.name)}
           >
-            <div style={{ fontWeight: "bold" }}>{student.name}</div>
-            <div style={{ color: "#555" }}>{student.reason || "Assigned detention"}</div>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                alignItems: "baseline",
+                flexWrap: "wrap",
+              }}
+            >
+              <strong>{student.name}</strong>
+              <span style={{ color: "#4b587c", fontSize: 14 }}>
+                {student.homegroup || "-"} · {formatDetentionReasonLabel(student.reason)}
+              </span>
+            </div>
           </div>
         ))
       )}
     </div>
   );
+}
+
+function formatDetentionReasonLabel(reason) {
+  const value = String(reason || "").trim();
+  const normalized = value.toLowerCase();
+
+  if (!value) {
+    return "Assigned detention";
+  }
+
+  if (normalized.includes("attendance")) {
+    return "Attendance";
+  }
+
+  if (normalized.includes("chronicle")) {
+    return "Chronicle";
+  }
+
+  return value;
 }

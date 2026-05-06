@@ -12,7 +12,9 @@ export default function CreateSessionCard({
   handleCreateSession,
 }) {
   return (
-    <div style={cardStyle}>
+    <div
+      style={{ ...cardStyle, maxWidth: "none", width: "100%", boxSizing: "border-box" }}
+    >
       <h2 style={sectionTitleStyle}>Create Detention</h2>
       <p style={sectionCopyStyle}>
         Add the next detention slot with a clear time and location.

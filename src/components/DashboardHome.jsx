@@ -187,9 +187,25 @@ export default function DashboardHome({
                     justifyContent: "space-between",
                     gap: 12,
                     alignItems: "center",
+                    flexWrap: "wrap",
                   }}
                 >
-                  <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "baseline",
+                      flexWrap: "wrap",
+                      minWidth: 0,
+                      flex: "1 1 260px",
+                    }}
+                  >
+                    <strong>{student.name}</strong>
+                    <span style={{ color: brandPalette.muted, fontSize: 14 }}>
+                      {student.homegroup || "-"} · {student.count}
+                      {isMobile ? "" : " Chronicle records"}
+                    </span>
+                  </div>
                   {student.count >= 3 ? (
                     <span
                       style={{
@@ -207,11 +223,6 @@ export default function DashboardHome({
                       3+ threshold
                     </span>
                   ) : null}
-                </div>
-                <div style={{ color: brandPalette.muted }}>
-                  {student.count}
-                  {isMobile ? "" : " Chronicle records"}
-                  {!isMobile && student.homegroup ? ` · ${student.homegroup}` : ""}
                 </div>
                 {expandedChronicleKey === student.key ? (
                   <div style={{ marginTop: 14 }}>
@@ -273,9 +284,25 @@ export default function DashboardHome({
                     justifyContent: "space-between",
                     gap: 12,
                     alignItems: "center",
+                    flexWrap: "wrap",
                   }}
                 >
-                  <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "baseline",
+                      flexWrap: "wrap",
+                      minWidth: 0,
+                      flex: "1 1 260px",
+                    }}
+                  >
+                    <strong>{student.name}</strong>
+                    <span style={{ color: brandPalette.muted, fontSize: 14 }}>
+                      {student.homegroup || "-"} · {student.count}
+                      {isMobile ? "" : " late incidents"}
+                    </span>
+                  </div>
                   {student.count >= 3 ? (
                     <span
                       style={{
@@ -293,11 +320,6 @@ export default function DashboardHome({
                       3+ threshold
                     </span>
                   ) : null}
-                </div>
-                <div style={{ color: brandPalette.muted }}>
-                  {student.count}
-                  {isMobile ? "" : " late incidents"}
-                  {!isMobile && student.homegroup ? ` · ${student.homegroup}` : ""}
                 </div>
                 {expandedAttendanceKey === student.key ? (
                   <div style={{ marginTop: 14 }}>
@@ -391,11 +413,21 @@ export default function DashboardHome({
                 style={{ ...entryCardStyle, cursor: "pointer" }}
                 onClick={() => setSelectedStudent(student.name)}
               >
-                <div style={{ fontWeight: "bold" }}>{student.name}</div>
-                <div style={{ color: brandPalette.muted }}>
-                  {student.count} missed detention{student.count === 1 ? "" : "s"}
-                  {!isMobile && student.homegroup ? ` · ${student.homegroup}` : ""}
-                  {!isMobile && student.yearLevel ? ` · Year ${student.yearLevel}` : ""}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    alignItems: "baseline",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <strong>{student.name}</strong>
+                  <span style={{ color: brandPalette.muted, fontSize: 14 }}>
+                    {student.homegroup || "-"}
+                    {!isMobile && student.yearLevel ? ` · Year ${student.yearLevel}` : ""}
+                    {" · "}
+                    {student.count} missed detention{student.count === 1 ? "" : "s"}
+                  </span>
                 </div>
               </div>
             ))
@@ -425,9 +457,18 @@ export default function DashboardHome({
                   style={{ ...entryCardStyle, cursor: "pointer" }}
                   onClick={() => setSelectedStudent(student.name)}
                 >
-                  <div style={{ fontWeight: "bold" }}>{student.name}</div>
-                  <div style={{ color: brandPalette.muted }}>
-                    {student.count} Chronicle records
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "baseline",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <strong>{student.name}</strong>
+                    <span style={{ color: brandPalette.muted, fontSize: 14 }}>
+                      {student.homegroup || "-"} · {student.count} Chronicle records
+                    </span>
                   </div>
                 </div>
               ))
@@ -450,9 +491,18 @@ export default function DashboardHome({
                   style={{ ...entryCardStyle, cursor: "pointer" }}
                   onClick={() => setSelectedStudent(student.name)}
                 >
-                  <div style={{ fontWeight: "bold" }}>{student.name}</div>
-                  <div style={{ color: brandPalette.muted }}>
-                    {student.count} late arrivals
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "baseline",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <strong>{student.name}</strong>
+                    <span style={{ color: brandPalette.muted, fontSize: 14 }}>
+                      {student.homegroup || "-"} · {student.count} late arrivals
+                    </span>
                   </div>
                 </div>
               ))
@@ -499,9 +549,25 @@ export default function DashboardHome({
                     justifyContent: "space-between",
                     gap: 12,
                     alignItems: "center",
+                    flexWrap: "wrap",
                   }}
                 >
-                  <div style={{ fontWeight: "bold" }}>{student.name}</div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "baseline",
+                      flexWrap: "wrap",
+                      minWidth: 0,
+                      flex: "1 1 260px",
+                    }}
+                  >
+                    <strong>{student.name}</strong>
+                    <span style={{ color: brandPalette.muted, fontSize: 14 }}>
+                      {student.homegroup || "-"} · {student.absentDayCount} day
+                      {student.absentDayCount === 1 ? "" : "s"}
+                    </span>
+                  </div>
                   <span
                     style={{
                       display: "inline-flex",
@@ -533,12 +599,6 @@ export default function DashboardHome({
                     {student.percentage.toFixed(1)}%
                   </span>
                 </div>
-                <div style={{ color: brandPalette.muted }}>
-                  {student.absentDayCount} unexplained full-day absence
-                  {student.absentDayCount === 1 ? "" : "s"}
-                  {!isMobile && student.homegroup ? ` · ${student.homegroup}` : ""}
-                  {!isMobile ? ` · Year ${student.yearLevel}` : ""}
-                </div>
               </div>
             ))
           )}
@@ -558,9 +618,18 @@ export default function DashboardHome({
                   key={`minor-behaviour-teacher-${teacher.name}`}
                   style={entryCardStyle}
                 >
-                  <div style={{ fontWeight: "bold" }}>{teacher.name}</div>
-                  <div style={{ color: brandPalette.muted }}>
-                    {teacher.count} minor behaviour chronicles
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "baseline",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <strong>{teacher.name}</strong>
+                    <span style={{ color: brandPalette.muted, fontSize: 14 }}>
+                      {teacher.count} minor behaviour chronicles
+                    </span>
                   </div>
                 </div>
               ))
@@ -583,9 +652,18 @@ export default function DashboardHome({
                   style={{ ...entryCardStyle, cursor: "pointer" }}
                   onClick={() => setSelectedStudent(student.name)}
                 >
-                  <div style={{ fontWeight: "bold" }}>{student.name}</div>
-                  <div style={{ color: brandPalette.muted }}>
-                    {student.count} detention records
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "baseline",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <strong>{student.name}</strong>
+                    <span style={{ color: brandPalette.muted, fontSize: 14 }}>
+                      {student.homegroup || "-"} · {student.count} detention records
+                    </span>
                   </div>
                 </div>
               ))
