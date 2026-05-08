@@ -480,6 +480,18 @@ export default function App() {
       attendance: "Unmarked",
     };
 
+    const duplicateEntry = entries.find(
+      (entry) =>
+        entry.session_id === payload.session_id &&
+        String(entry.student_name || "").trim().toLowerCase() ===
+          String(payload.student_name || "").trim().toLowerCase()
+    );
+
+    if (duplicateEntry) {
+      setDataError("That student is already assigned to this detention.");
+      return;
+    }
+
     const { data, error } = await supabase
       .from("entries")
       .insert([payload])
@@ -1506,6 +1518,10 @@ export default function App() {
     () => sessions.find((session) => session.id === selectedSessionId) || null,
     [sessions, selectedSessionId]
   );
+  const assignableSessions = useMemo(
+    () => sessions.filter((session) => session.date && session.date >= todayString),
+    [sessions]
+  );
 
   const selectedSessionEntries = useMemo(() => {
     if (!selectedSessionId) return [];
@@ -2468,7 +2484,7 @@ export default function App() {
                   handleAddEntry={handleAddEntry}
                   newEntry={currentEntry}
                   setNewEntry={setNewEntry}
-                  sessions={sessions}
+                  sessions={assignableSessions}
                   studentSearch={studentSearch}
                   setStudentSearch={setStudentSearch}
                   studentDropdownOpen={studentDropdownOpen}
@@ -2537,7 +2553,7 @@ export default function App() {
               setChronicleOnly3Plus={setChronicleOnly3Plus}
               chronicleSessionId={chronicleSessionId}
               setChronicleSessionId={setChronicleSessionId}
-              sessions={sessions}
+              sessions={assignableSessions}
               chronicleYearOptions={chronicleYearOptions}
               assignSelectedChronicleGroups={assignSelectedChronicleGroups}
               filteredChronicle={filteredChronicle}
@@ -2562,7 +2578,7 @@ export default function App() {
               setAttendanceOnly3Plus={setAttendanceOnly3Plus}
               attendanceSessionId={attendanceSessionId}
               setAttendanceSessionId={setAttendanceSessionId}
-              sessions={sessions}
+              sessions={assignableSessions}
               attendanceYearOptions={attendanceYearOptions}
               assignSelectedAttendanceGroups={assignSelectedAttendanceGroups}
               filteredAttendance={filteredAttendance}
@@ -2674,6 +2690,21 @@ function parseChronicleDate(value) {
   if (!value) return null;
 
   const text = String(value).trim();
+  const sqlMatch = text.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)$/
+  );
+  if (sqlMatch) {
+    const [, year, month, day, hour = "0", minute = "0", second = "0"] = sqlMatch;
+    return new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second)
+    );
+  }
+
   const match = text.match(
     /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i
   );
@@ -2946,7 +2977,7 @@ function createAttendanceRecord(row) {
 
 function mapChronicleRecordToView(record, studentLookupByCode = {}) {
   const occurredDate = record.occurred_at
-    ? new Date(record.occurred_at)
+    ? parseChronicleDate(record.occurred_at)
     : parseChronicleDate(record.occurred_timestamp);
   const student = studentLookupByCode[record.student_code] || null;
   const studentName = student
@@ -2974,14 +3005,20 @@ function mapChronicleRecordToView(record, studentLookupByCode = {}) {
 }
 
 function mapAttendanceRecordToView(record, studentLookupByCode = {}) {
-  const startDate = record.start_at
-    ? new Date(record.start_at)
-    : parseAttendanceDateTime(record.start_time_text);
+  const startDate =
+    parseAttendanceDateTime(record.start_time_text) ||
+    parseChronicleDate(record.start_at);
   const student = studentLookupByCode[record.student_code] || null;
   const studentName = student
     ? `${student.first_name} ${student.last_name}`
     : "Unknown Student";
   const attendanceType = classifyAttendanceType(record);
+  const arrivalDate = resolveAttendanceArrivalDate(record, startDate);
+  const derivedMinutesLate =
+    startDate && arrivalDate && arrivalDate > startDate
+      ? Math.round((arrivalDate.getTime() - startDate.getTime()) / 60000)
+      : 0;
+  const minutesLate = Number(record.minutes_late || 0) || derivedMinutesLate;
 
   return {
     key: record.id,
@@ -2991,12 +3028,11 @@ function mapAttendanceRecordToView(record, studentLookupByCode = {}) {
     yearLevel: String(student?.year_level || ""),
     homegroup: student?.homegroup || "",
     startText: startDate ? formatDisplayDateTime(startDate) : record.start_time_text || "",
-    arrivalText:
-      record.arrival_at && parseChronicleDate(record.arrival_at)
-        ? formatDisplayTime(parseChronicleDate(record.arrival_at))
-        : record.arrival_time_text || "",
+    arrivalText: arrivalDate
+      ? formatDisplayTime(arrivalDate)
+      : normalizeAttendanceArrivalText(record.arrival_time_text),
     period: record.period || "",
-    activityName: record.activity_name || "",
+    activityName: normalizeAttendanceActivityName(record.activity_name || ""),
     sourceType: record.source_type || "",
     statusName: record.status_name || "",
     statusCode: record.status_code || "",
@@ -3007,7 +3043,7 @@ function mapAttendanceRecordToView(record, studentLookupByCode = {}) {
       record.status_description ||
       (attendanceType === "School late" ? "Late to school" : "Late to class"),
     teacher: record.teacher || "",
-    minutesLate: Number(record.minutes_late || 0),
+    minutesLate,
     startAtDate: startDate,
     weekKey: startDate ? getFridayWeekKey(startDate) : record.week_key || "unknown-week",
     weekLabel:
@@ -3017,7 +3053,7 @@ function mapAttendanceRecordToView(record, studentLookupByCode = {}) {
 
 function mapApprovedAbsenceRecordToView(record, studentLookupByCode = {}) {
   const startDate = record.start_at
-    ? new Date(record.start_at)
+    ? parseChronicleDate(record.start_at)
     : parseAttendanceDateTime(record.start_time_text);
   const student = studentLookupByCode[record.student_code] || null;
   const studentName = student
@@ -3193,6 +3229,44 @@ function parseAttendanceArrivalTime(value, baseDate) {
     h,
     Number(minute)
   );
+}
+
+function normalizeAttendanceArrivalText(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  if (trimmed.includes("T")) return "";
+  return trimmed;
+}
+
+function normalizeAttendanceActivityName(value) {
+  return String(value || "")
+    .replace(/\s*Arrive at\s+\d{1,2}:\d{2}\s*[AP]M\s*$/i, "")
+    .trim();
+}
+
+function extractArrivalTimeTextFromDescription(value) {
+  const match = String(value || "").match(/Arrive at\s+(\d{1,2}:\d{2}\s*[AP]M)/i);
+  if (!match?.[1]) return "";
+  return match[1].replace(/\s+/g, "").toUpperCase();
+}
+
+function resolveAttendanceArrivalDate(record, startDate) {
+  const fromArrivalAt = parseChronicleDate(record.arrival_at);
+  if (fromArrivalAt) return fromArrivalAt;
+
+  const fromArrivalText =
+    parseChronicleDate(record.arrival_time_text) ||
+    parseAttendanceArrivalTime(record.arrival_time_text, startDate);
+  if (fromArrivalText) return fromArrivalText;
+
+  const descriptionArrivalText =
+    extractArrivalTimeTextFromDescription(record.activity_name) ||
+    extractArrivalTimeTextFromDescription(record.status_description);
+  if (descriptionArrivalText) {
+    return parseAttendanceArrivalTime(descriptionArrivalText, startDate);
+  }
+
+  return null;
 }
 
 function isTodoOverdue(dueDate, isDone) {

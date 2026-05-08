@@ -13,7 +13,7 @@ import ccMapPin from "../assets/cc-map-pin.svg";
 const DETENTION_REASON_OPTIONS = [
   "Disruptive behaviour",
   "Failure to follow instruction",
-  "Late to class",
+  "Late to class/Late to school",
   "Refusal to complete set tasks",
   "Inappropriate use of ICT",
   "Other",
