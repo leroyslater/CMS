@@ -236,6 +236,7 @@ export default function App() {
 
       setPasswordRecoveryMode(false);
       if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem("strike-track-password-recovery");
         window.history.replaceState({}, document.title, window.location.pathname);
       }
       setMessage("Password updated.");
@@ -2346,6 +2347,20 @@ export default function App() {
 
   if (booting) return <div>Loading...</div>;
 
+  if (passwordRecoveryMode) {
+    return (
+      <div style={pageStyle}>
+        {error ? <p style={statusErrorStyle}>{error}</p> : null}
+        {message ? <p style={statusSuccessStyle}>{message}</p> : null}
+        <AccountSettingsCard
+          recoveryMode={passwordRecoveryMode}
+          updatingPassword={updatingPassword}
+          onUpdatePassword={handleUpdatePassword}
+        />
+      </div>
+    );
+  }
+
   if (!authSession) {
     return (
         <AuthScreen
@@ -2360,20 +2375,6 @@ export default function App() {
           error={error}
           message={message}
         />
-    );
-  }
-
-  if (passwordRecoveryMode) {
-    return (
-      <div style={pageStyle}>
-        {error ? <p style={statusErrorStyle}>{error}</p> : null}
-        {message ? <p style={statusSuccessStyle}>{message}</p> : null}
-        <AccountSettingsCard
-          recoveryMode={passwordRecoveryMode}
-          updatingPassword={updatingPassword}
-          onUpdatePassword={handleUpdatePassword}
-        />
-      </div>
     );
   }
 
