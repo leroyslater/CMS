@@ -21,8 +21,10 @@ export default function MissedDetentionCard({
   const [moveSessionId, setMoveSessionId] = useState("");
 
   function startMovingEntry(entry) {
+    const nextSessionId =
+      sessions.find((session) => session.id !== entry.session_id)?.id || "";
     setMovingEntryId(entry.id);
-    setMoveSessionId(entry.session_id || "");
+    setMoveSessionId(nextSessionId);
   }
 
   async function handleMoveEntry(entry) {

@@ -1523,6 +1523,13 @@ export default function App() {
     [sessions]
   );
 
+  useEffect(() => {
+    const upcomingSessionId = assignableSessions[0]?.id || "";
+    if (!upcomingSessionId) return;
+    if (!isSupervisor && activePage !== "supervisor") return;
+    setSelectedSessionId(upcomingSessionId);
+  }, [activePage, assignableSessions, isSupervisor, setSelectedSessionId]);
+
   const selectedSessionEntries = useMemo(() => {
     if (!selectedSessionId) return [];
     return entries.filter((entry) => entry.session_id === selectedSessionId);
@@ -2510,7 +2517,7 @@ export default function App() {
 
               <MissedDetentionCard
                 missedEntries={missedDetentionEntries}
-                sessions={sessions}
+                sessions={assignableSessions}
                 onUpdateEntry={handleUpdateEntry}
                 onDeleteEntry={handleDeleteEntry}
                 entrySavingId={entrySavingId}

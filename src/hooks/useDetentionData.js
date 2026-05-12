@@ -58,7 +58,7 @@ export function useDetentionData(authSession, todayString) {
     const safeStudents = studentsData || [];
     const safeSessions = sessionsData || [];
     const safeEntries = entriesData || [];
-    const firstSessionId = safeSessions[0]?.id || "";
+    const firstSessionId = getDefaultSelectedSessionId(safeSessions, todayString);
 
     setStudents(safeStudents);
     setSessions(safeSessions);
@@ -246,4 +246,15 @@ function getVictorianTermWeek(weekEndingDate) {
     term: term.term,
     week: weekOffset + 1,
   };
+}
+
+function getDefaultSelectedSessionId(sessions, todayString) {
+  const upcomingSession =
+    sessions.find((session) => session.date && session.date >= todayString) || null;
+
+  if (upcomingSession?.id) {
+    return upcomingSession.id;
+  }
+
+  return sessions[0]?.id || "";
 }
