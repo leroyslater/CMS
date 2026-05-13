@@ -2353,6 +2353,7 @@ export default function App() {
         {error ? <p style={statusErrorStyle}>{error}</p> : null}
         {message ? <p style={statusSuccessStyle}>{message}</p> : null}
         <AccountSettingsCard
+          profile={profile}
           recoveryMode={passwordRecoveryMode}
           updatingPassword={updatingPassword}
           onUpdatePassword={handleUpdatePassword}
@@ -2458,6 +2459,7 @@ export default function App() {
           {activePage === "account" ? (
             <>
               <AccountSettingsCard
+                profile={profile}
                 recoveryMode={passwordRecoveryMode}
                 updatingPassword={updatingPassword}
                 onUpdatePassword={handleUpdatePassword}

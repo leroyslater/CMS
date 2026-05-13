@@ -9,6 +9,7 @@ import {
 } from "../styles/uiStyles";
 
 export default function AccountSettingsCard({
+  profile,
   recoveryMode,
   updatingPassword,
   onUpdatePassword,
@@ -39,6 +40,18 @@ export default function AccountSettingsCard({
           ? "Set a new password to complete your email recovery flow."
           : "You can update your password here. Account creation is restricted to admins."}
       </p>
+      {!recoveryMode ? (
+        <div style={{ color: "#4b587c", marginBottom: 16 }}>
+          <div style={{ fontWeight: "bold", color: "#17334b", marginBottom: 4 }}>
+            {profile?.full_name || "Unnamed user"}
+          </div>
+          <div>{profile?.email || "-"}</div>
+          <div style={{ marginTop: 4 }}>
+            {profile?.role || "coordinator"}
+            {profile?.year_levels?.length ? ` · Year levels: ${profile.year_levels.join(", ")}` : ""}
+          </div>
+        </div>
+      ) : null}
       <form onSubmit={handleSubmit}>
         <input
           style={inputStyle}
