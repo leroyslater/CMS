@@ -258,8 +258,8 @@ async function getAllowedRequester(requesterSupabase, adminSupabase) {
     return { status: 500, error: profileError.message };
   }
 
-  if (profile?.role === "supervisor") {
-    return { status: 403, error: "Supervisors cannot sync attendance data." };
+  if (!["coordinator", "admin"].includes(profile?.role)) {
+    return { status: 403, error: "Only coordinators and admins can sync attendance data." };
   }
 
   return { status: 200, user };

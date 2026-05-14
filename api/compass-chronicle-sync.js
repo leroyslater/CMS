@@ -144,8 +144,8 @@ async function getAllowedRequester(adminSupabase, token) {
     return { status: 500, error: profileError.message };
   }
 
-  if (profile?.role === "supervisor") {
-    return { status: 403, error: "Supervisors cannot sync Chronicle data." };
+  if (!["coordinator", "admin"].includes(profile?.role)) {
+    return { status: 403, error: "Only coordinators and admins can sync Chronicle data." };
   }
 
   return { status: 200, user };

@@ -49,7 +49,7 @@ export default function AuthScreen({
         >
           School Behaviour Operations
         </p>
-        <p style={sectionCopyStyle}>Login for supervisors and coordinators.</p>
+        <p style={sectionCopyStyle}>Login for teachers, supervisors, and coordinators.</p>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           <button

@@ -20,6 +20,7 @@ import UpcomingSessionAssignmentsCard from "./UpcomingSessionAssignmentsCard";
 export default function DashboardHome({
   stats,
   showYearFilters,
+  teacherView = false,
   availableYearLevels,
   selectedYearLevels,
   onToggleYearLevel,
@@ -111,7 +112,7 @@ export default function DashboardHome({
 
   return (
     <>
-      {isMobile ? null : <DashboardStats stats={stats} />}
+      {isMobile || teacherView ? null : <DashboardStats stats={stats} />}
 
       {showYearFilters ? (
         <div style={mobileTwoColStyle}>
@@ -131,7 +132,7 @@ export default function DashboardHome({
                 }}
                 onClick={onClearYearLevels}
               >
-                All years
+                {isMobile ? "All" : "All years"}
               </button>
               {availableYearLevels.map((yearLevel) => {
                 const selected = selectedYearLevels.includes(yearLevel);
@@ -146,7 +147,7 @@ export default function DashboardHome({
                     }}
                     onClick={() => onToggleYearLevel(yearLevel)}
                   >
-                    Year {yearLevel}
+                    {isMobile ? yearLevel : `Year ${yearLevel}`}
                   </button>
                 );
               })}
@@ -155,7 +156,13 @@ export default function DashboardHome({
         </div>
       ) : null}
 
-      <div style={mobileTwoColStyle}>
+      <div
+        style={
+          teacherView
+            ? { ...mobileTwoColStyle, gridTemplateColumns: "1fr" }
+            : mobileTwoColStyle
+        }
+      >
         <div style={cardStyle}>
           <h2 style={sectionTitleStyle}>Chronicle 2+ This Week</h2>
           {isMobile ? null : (
@@ -253,148 +260,153 @@ export default function DashboardHome({
           )}
         </div>
 
-        <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Late 2+ This Week</h2>
-          {isMobile ? null : (
-            <p style={sectionCopyStyle}>
-            Students with two or more late incidents in the current tracked week.
-            </p>
-          )}
-          {attendanceTwoPlusThisWeek.length === 0 ? (
-            <p>No students have reached two late incidents this week yet.</p>
-          ) : (
-            attendanceTwoPlusThisWeek.map((student) => (
-              <div
-                key={student.key}
-                style={{
-                  ...entryCardStyle,
-                  cursor: "pointer",
-                  border:
-                    student.count >= 3
-                      ? "2px solid #dc2626"
-                      : entryCardStyle.border,
-                  background:
-                    student.count >= 3 ? "#fef2f2" : entryCardStyle.background,
-                }}
-                onClick={() => toggleDashboardAttendanceStudent(student)}
-              >
+        {teacherView ? null : (
+          <div style={cardStyle}>
+            <h2 style={sectionTitleStyle}>Late 2+ This Week</h2>
+            {isMobile ? null : (
+              <p style={sectionCopyStyle}>
+              Students with two or more late incidents in the current tracked week.
+              </p>
+            )}
+            {attendanceTwoPlusThisWeek.length === 0 ? (
+              <p>No students have reached two late incidents this week yet.</p>
+            ) : (
+              attendanceTwoPlusThisWeek.map((student) => (
                 <div
+                  key={student.key}
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    alignItems: "center",
-                    flexWrap: "wrap",
+                    ...entryCardStyle,
+                    cursor: "pointer",
+                    border:
+                      student.count >= 3
+                        ? "2px solid #dc2626"
+                        : entryCardStyle.border,
+                    background:
+                      student.count >= 3 ? "#fef2f2" : entryCardStyle.background,
                   }}
+                  onClick={() => toggleDashboardAttendanceStudent(student)}
                 >
                   <div
                     style={{
                       display: "flex",
-                      gap: 10,
-                      alignItems: "baseline",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      alignItems: "center",
                       flexWrap: "wrap",
-                      minWidth: 0,
-                      flex: "1 1 260px",
                     }}
                   >
-                    <strong>{student.name}</strong>
-                    <span style={{ color: brandPalette.muted, fontSize: 14 }}>
-                      {student.homegroup || "-"} · {student.count}
-                      {isMobile ? "" : " late incidents"}
-                    </span>
-                  </div>
-                  {student.count >= 3 ? (
-                    <span
+                    <div
                       style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        padding: "6px 10px",
-                        borderRadius: 999,
-                        fontSize: 12,
-                        fontWeight: 800,
-                        color: "#b91c1c",
-                        background: "#fee2e2",
-                        border: "1px solid #fca5a5",
+                        display: "flex",
+                        gap: 10,
+                        alignItems: "baseline",
+                        flexWrap: "wrap",
+                        minWidth: 0,
+                        flex: "1 1 260px",
                       }}
                     >
-                      3+ threshold
-                    </span>
-                  ) : null}
-                </div>
-                {expandedAttendanceKey === student.key ? (
-                  <div style={{ marginTop: 14 }}>
-                    <div style={{ fontWeight: "bold", marginBottom: 8 }}>
-                      Attendance Incident Detail
+                      <strong>{student.name}</strong>
+                      <span style={{ color: brandPalette.muted, fontSize: 14 }}>
+                        {student.homegroup || "-"} · {student.count}
+                        {isMobile ? "" : " late incidents"}
+                      </span>
                     </div>
-                    {student.rows.map((row, index) => (
-                      <div
-                        key={`${student.key}-${index}`}
-                        style={{ ...entryCardStyle, marginTop: 8 }}
+                    {student.count >= 3 ? (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          padding: "6px 10px",
+                          borderRadius: 999,
+                          fontSize: 12,
+                          fontWeight: 800,
+                          color: "#b91c1c",
+                          background: "#fee2e2",
+                          border: "1px solid #fca5a5",
+                        }}
                       >
+                        3+ threshold
+                      </span>
+                    ) : null}
+                  </div>
+                  {expandedAttendanceKey === student.key ? (
+                    <div style={{ marginTop: 14 }}>
+                      <div style={{ fontWeight: "bold", marginBottom: 8 }}>
+                        Attendance Incident Detail
+                      </div>
+                      {student.rows.map((row, index) => (
                         <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            gap: 12,
-                            alignItems: "center",
-                            marginBottom: 8,
-                          }}
+                          key={`${student.key}-${index}`}
+                          style={{ ...entryCardStyle, marginTop: 8 }}
                         >
-                          <div style={{ fontWeight: "bold" }}>
-                            {row.startText} · {row.period || "No period"}
-                          </div>
-                          <span
+                          <div
                             style={{
-                              display: "inline-flex",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              gap: 12,
                               alignItems: "center",
-                              padding: "6px 10px",
-                              borderRadius: 999,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color:
-                                row.attendanceType === "School late"
-                                  ? brandPalette.navy
-                                  : "#8a341f",
-                              background:
-                                row.attendanceType === "School late"
-                                  ? brandPalette.mintSoft
-                                  : "#fff2eb",
-                              border:
-                                row.attendanceType === "School late"
-                                  ? "1px solid rgba(92,231,170,0.45)"
-                                  : "1px solid #f1c7b1",
+                              marginBottom: 8,
                             }}
                           >
-                            {row.attendanceType}
-                          </span>
+                            <div style={{ fontWeight: "bold" }}>
+                              {row.startText} · {row.period || "No period"}
+                            </div>
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                padding: "6px 10px",
+                                borderRadius: 999,
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color:
+                                  row.attendanceType === "School late"
+                                    ? brandPalette.navy
+                                    : "#8a341f",
+                                background:
+                                  row.attendanceType === "School late"
+                                    ? brandPalette.mintSoft
+                                    : "#fff2eb",
+                                border:
+                                  row.attendanceType === "School late"
+                                    ? "1px solid rgba(92,231,170,0.45)"
+                                    : "1px solid #f1c7b1",
+                              }}
+                            >
+                              {row.attendanceType}
+                            </span>
+                          </div>
+                          <div>
+                            <strong>Class:</strong> {row.activityName || "-"}
+                          </div>
+                          <div>
+                            <strong>Arrival:</strong>{" "}
+                            {row.attendanceType === "Class late"
+                              ? "Not recorded"
+                              : row.arrivalText || "-"}
+                          </div>
+                          <div>
+                            <strong>Minutes late:</strong> {row.minutesLate}
+                          </div>
+                          <div>
+                            <strong>Type:</strong> {row.attendanceDescription || "-"}
+                          </div>
+                          <div>
+                            <strong>Teacher:</strong> {row.teacher || "-"}
+                          </div>
                         </div>
-                        <div>
-                          <strong>Class:</strong> {row.activityName || "-"}
-                        </div>
-                        <div>
-                          <strong>Arrival:</strong>{" "}
-                          {row.attendanceType === "Class late"
-                            ? "Not recorded"
-                            : row.arrivalText || "-"}
-                        </div>
-                        <div>
-                          <strong>Minutes late:</strong> {row.minutesLate}
-                        </div>
-                        <div>
-                          <strong>Type:</strong> {row.attendanceDescription || "-"}
-                        </div>
-                        <div>
-                          <strong>Teacher:</strong> {row.teacher || "-"}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ))
-          )}
-        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
+
+      {teacherView ? null : (
+        <>
 
       <div style={mobileTwoColStyle}>
         <div style={cardStyle}>
@@ -771,6 +783,8 @@ export default function DashboardHome({
             )}
           </div>
         </div>
+      )}
+        </>
       )}
     </>
   );

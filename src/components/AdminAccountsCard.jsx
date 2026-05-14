@@ -24,14 +24,16 @@ export default function AdminAccountsCard({
 }) {
   const [createEmail, setCreateEmail] = useState("");
   const [createFullName, setCreateFullName] = useState("");
-  const [createRole, setCreateRole] = useState("supervisor");
+  const [createRole, setCreateRole] = useState("teacher");
   const [createYearLevels, setCreateYearLevels] = useState("");
+  const [createMobileNumber, setCreateMobileNumber] = useState("");
   const [editingAccountId, setEditingAccountId] = useState(null);
   const [editForm, setEditForm] = useState({
     email: "",
     fullName: "",
-    role: "supervisor",
+    role: "teacher",
     yearLevels: "",
+    mobileNumber: "",
     newPassword: "",
   });
 
@@ -42,13 +44,15 @@ export default function AdminAccountsCard({
       fullName: createFullName,
       role: createRole,
       yearLevels: createYearLevels,
+      mobileNumber: createMobileNumber,
     });
 
     if (ok) {
       setCreateEmail("");
       setCreateFullName("");
-      setCreateRole("supervisor");
+      setCreateRole("teacher");
       setCreateYearLevels("");
+      setCreateMobileNumber("");
     }
   }
 
@@ -57,8 +61,9 @@ export default function AdminAccountsCard({
     setEditForm({
       email: account.email || "",
       fullName: account.full_name || "",
-      role: account.role || "supervisor",
+      role: account.role || "teacher",
       yearLevels: (account.year_levels || []).join(", "),
+      mobileNumber: account.mobile_number || "",
       newPassword: "",
     });
   }
@@ -93,6 +98,7 @@ export default function AdminAccountsCard({
             value={createRole}
             onChange={(event) => setCreateRole(event.target.value)}
           >
+            <option value="teacher">Teacher</option>
             <option value="supervisor">Supervisor</option>
             <option value="coordinator">Coordinator</option>
             <option value="admin">Admin</option>
@@ -102,6 +108,12 @@ export default function AdminAccountsCard({
             placeholder="Year levels (comma separated, e.g. 7, 8)"
             value={createYearLevels}
             onChange={(event) => setCreateYearLevels(event.target.value)}
+          />
+          <input
+            style={inputStyle}
+            placeholder="Mobile number (for alerts)"
+            value={createMobileNumber}
+            onChange={(event) => setCreateMobileNumber(event.target.value)}
           />
           <button
             type="submit"
@@ -156,6 +168,7 @@ export default function AdminAccountsCard({
                       setEditForm((prev) => ({ ...prev, role: event.target.value }))
                     }
                   >
+                    <option value="teacher">Teacher</option>
                     <option value="supervisor">Supervisor</option>
                     <option value="coordinator">Coordinator</option>
                     <option value="admin">Admin</option>
@@ -168,6 +181,16 @@ export default function AdminAccountsCard({
                     value={editForm.yearLevels}
                     onChange={(event) =>
                       setEditForm((prev) => ({ ...prev, yearLevels: event.target.value }))
+                    }
+                  />
+                  <input
+                    style={inputStyle}
+                    name={`edit-account-mobile-${account.id}`}
+                    autoComplete="off"
+                    placeholder="Mobile number"
+                    value={editForm.mobileNumber}
+                    onChange={(event) =>
+                      setEditForm((prev) => ({ ...prev, mobileNumber: event.target.value }))
                     }
                   />
                   <input
@@ -193,6 +216,7 @@ export default function AdminAccountsCard({
                           fullName: editForm.fullName,
                           role: editForm.role,
                           yearLevels: editForm.yearLevels,
+                          mobileNumber: editForm.mobileNumber,
                           newPassword: editForm.newPassword,
                         });
                         if (ok) {
@@ -226,6 +250,11 @@ export default function AdminAccountsCard({
                   {account.year_levels?.length ? (
                     <div style={{ color: "#4b587c", marginTop: 4 }}>
                       Year levels: {account.year_levels.join(", ")}
+                    </div>
+                  ) : null}
+                  {account.mobile_number ? (
+                    <div style={{ color: "#4b587c", marginTop: 4 }}>
+                      Mobile: {account.mobile_number}
                     </div>
                   ) : null}
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>

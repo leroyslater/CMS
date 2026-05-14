@@ -22,6 +22,7 @@ export function useAuth() {
           full_name: user.user_metadata?.full_name || "",
           role: user.user_metadata?.role || "coordinator",
           year_levels: user.user_metadata?.year_levels || [],
+          mobile_number: user.user_metadata?.mobile_number || "",
         }
       );
     } catch (err) {

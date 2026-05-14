@@ -25,10 +25,12 @@ const headerButtonHighlightStyle = {
 export default function AppHeader({
   handleLogout,
   onOpenAccount,
+  onOpenClassroomRemovalAlert,
   accountActive,
   pages = [],
   activePage,
   onSelectPage,
+  showClassroomRemovalAlertButton = false,
 }) {
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" ? window.innerWidth <= 768 : false
@@ -52,6 +54,15 @@ export default function AppHeader({
   }, []);
 
   const mobileButtonSize = isMobile ? 38 : 44;
+  const dashboardPage = pages.find((page) => page.id === "dashboard") || null;
+  const primaryPages = pages.filter((page) => page.id !== "dashboard");
+  const alertButtonStyle = {
+    ...smallButtonStyle,
+    border: "1px solid rgba(255, 109, 109, 0.76)",
+    background: "linear-gradient(135deg, rgba(222, 53, 53, 0.98) 0%, rgba(255, 105, 105, 0.98) 100%)",
+    color: "#fff",
+    boxShadow: "0 12px 24px rgba(157, 31, 31, 0.28)",
+  };
 
   return (
     <div
@@ -93,6 +104,45 @@ export default function AppHeader({
         </div>
         {isMobile ? (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flex: "0 0 auto" }}>
+            {showClassroomRemovalAlertButton ? (
+              <button
+                type="button"
+                style={{
+                  ...alertButtonStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: mobileButtonSize,
+                  height: mobileButtonSize,
+                  padding: 0,
+                }}
+                onClick={onOpenClassroomRemovalAlert}
+                aria-label="Send classroom removal alert"
+                title="Classroom removal alert"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M12 8V13"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M12 17H12.01"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M10.29 3.85999L1.81997 18C1.64418 18.3045 1.55148 18.6497 1.55127 19.0013C1.55106 19.3528 1.64334 19.6981 1.81877 20.0028C1.9942 20.3076 2.24671 20.5614 2.5506 20.7384C2.85449 20.9155 3.19938 21.0097 3.55097 21.011H20.449C20.8006 21.0097 21.1455 20.9155 21.4494 20.7384C21.7532 20.5614 22.0057 20.3076 22.1812 20.0028C22.3566 19.6981 22.4489 19.3528 22.4487 19.0013C22.4485 18.6497 22.3558 18.3045 22.18 18L13.71 3.85999C13.5329 3.56384 13.2822 3.31892 12.982 3.1488C12.6819 2.97867 12.3427 2.88916 11.9977 2.88916C11.6526 2.88916 11.3134 2.97867 11.0133 3.1488C10.7132 3.31892 10.4624 3.56384 10.2853 3.85999H10.29Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            ) : null}
             {pages.length > 0 ? (
               <button
                 type="button"
@@ -205,7 +255,7 @@ export default function AppHeader({
           </div>
         ) : null}
       </div>
-      {!isMobile && pages.length > 0 ? (
+      {!isMobile && primaryPages.length > 0 ? (
         <div
           style={{
             display: "flex",
@@ -220,7 +270,7 @@ export default function AppHeader({
             WebkitOverflowScrolling: "touch",
           }}
         >
-          {pages.map((page) => (
+          {primaryPages.map((page) => (
             <button
               key={page.id}
               type="button"
@@ -306,6 +356,45 @@ export default function AppHeader({
       ) : null}
       {!isMobile ? (
       <div style={{ display: "flex", alignItems: "center", gap: 12, flex: "0 0 auto" }}>
+        {dashboardPage ? (
+          <button
+            type="button"
+            style={{
+              ...navButtonStyle,
+              ...headerButtonBaseStyle,
+              ...(activePage === dashboardPage.id ? navButtonActiveStyle : {}),
+              border:
+                activePage === dashboardPage.id
+                  ? navButtonActiveStyle.border
+                  : headerButtonBaseStyle.border,
+              background:
+                activePage === dashboardPage.id
+                  ? navButtonActiveStyle.background
+                  : headerButtonBaseStyle.background,
+              color:
+                activePage === dashboardPage.id
+                  ? navButtonActiveStyle.color
+                  : headerButtonBaseStyle.color,
+              boxShadow:
+                activePage === dashboardPage.id
+                  ? navButtonActiveStyle.boxShadow
+                  : headerButtonBaseStyle.boxShadow,
+              whiteSpace: "nowrap",
+            }}
+            onClick={() => onSelectPage?.(dashboardPage.id)}
+          >
+            {dashboardPage.label}
+          </button>
+        ) : null}
+        {showClassroomRemovalAlertButton ? (
+          <button
+            type="button"
+            style={alertButtonStyle}
+            onClick={onOpenClassroomRemovalAlert}
+          >
+            Removal Alert
+          </button>
+        ) : null}
         <button
           type="button"
           style={{

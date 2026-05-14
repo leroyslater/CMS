@@ -90,7 +90,7 @@ async function getAllowedRequester(requesterSupabase, adminSupabase) {
     return { status: 500, error: profileError.message };
   }
 
-  if (!profile || profile.role === "supervisor") {
+  if (!profile || !["coordinator", "admin"].includes(profile.role)) {
     return { status: 403, error: "Only coordinators and admins can remove students from sessions." };
   }
 

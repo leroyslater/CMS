@@ -50,6 +50,9 @@ export default function AccountSettingsCard({
             {profile?.role || "coordinator"}
             {profile?.year_levels?.length ? ` · Year levels: ${profile.year_levels.join(", ")}` : ""}
           </div>
+          {profile?.mobile_number ? (
+            <div style={{ marginTop: 4 }}>Mobile: {profile.mobile_number}</div>
+          ) : null}
         </div>
       ) : null}
       <form onSubmit={handleSubmit}>

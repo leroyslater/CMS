@@ -116,7 +116,7 @@ async function handleListUsers(adminSupabase, res) {
   const userIds = users.map((user) => user.id);
   const { data: profiles, error: profilesError } = await adminSupabase
     .from("profiles")
-    .select("id, email, full_name, role, year_levels")
+    .select("id, email, full_name, role, year_levels, mobile_number")
     .in("id", userIds);
 
   if (profilesError) {
@@ -132,6 +132,7 @@ async function handleListUsers(adminSupabase, res) {
       full_name: profile?.full_name || user.user_metadata?.full_name || "",
       role: profile?.role || user.user_metadata?.role || "coordinator",
       year_levels: normalizeYearLevels(profile?.year_levels ?? user.user_metadata?.year_levels),
+      mobile_number: profile?.mobile_number || user.user_metadata?.mobile_number || "",
       last_sign_in_at: user.last_sign_in_at || null,
       created_at: user.created_at || null,
     };
@@ -141,7 +142,7 @@ async function handleListUsers(adminSupabase, res) {
 }
 
 async function handleCreateUser(adminSupabase, body, res) {
-  const { email, fullName, role, yearLevels } = body || {};
+  const { email, fullName, role, yearLevels, mobileNumber } = body || {};
 
   if (!email || !fullName || !role) {
     return res.status(400).json({ error: "Email, full name, and role are required." });
@@ -157,6 +158,7 @@ async function handleCreateUser(adminSupabase, body, res) {
       full_name: fullName,
       role,
       year_levels: normalizeYearLevels(yearLevels),
+      mobile_number: normalizeMobileNumber(mobileNumber),
     },
   });
 
@@ -170,6 +172,7 @@ async function handleCreateUser(adminSupabase, body, res) {
     full_name: fullName,
     role,
     year_levels: normalizeYearLevels(yearLevels),
+    mobile_number: normalizeMobileNumber(mobileNumber),
   });
 
   if (profileError) {
@@ -190,7 +193,7 @@ async function handleCreateUser(adminSupabase, body, res) {
 }
 
 async function handleUpdateUser(adminSupabase, body, res) {
-  const { id, email, fullName, role, yearLevels, newPassword } = body || {};
+  const { id, email, fullName, role, yearLevels, mobileNumber, newPassword } = body || {};
 
   if (!id || !email || !fullName || !role) {
     return res.status(400).json({ error: "User id, email, full name, and role are required." });
@@ -202,6 +205,7 @@ async function handleUpdateUser(adminSupabase, body, res) {
       full_name: fullName,
       role,
       year_levels: normalizeYearLevels(yearLevels),
+      mobile_number: normalizeMobileNumber(mobileNumber),
     },
   };
 
@@ -224,6 +228,7 @@ async function handleUpdateUser(adminSupabase, body, res) {
     full_name: fullName,
     role,
     year_levels: normalizeYearLevels(yearLevels),
+    mobile_number: normalizeMobileNumber(mobileNumber),
   });
 
   if (profileError) {
@@ -287,6 +292,10 @@ function normalizeYearLevels(value) {
   }
 
   return [];
+}
+
+function normalizeMobileNumber(value) {
+  return String(value || "").trim();
 }
 
 function createTemporaryPassword() {

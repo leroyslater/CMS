@@ -6,6 +6,7 @@ import AdminAccountsCard from "./components/AdminAccountsCard";
 import AppHeader from "./components/AppHeader";
 import AuthScreen from "./components/AuthScreen";
 import ChronicleImportCard from "./components/ChronicleImportCard";
+import ClassroomRemovalAlertModal from "./components/ClassroomRemovalAlertModal";
 import ConfigScreen from "./components/ConfigScreen";
 import CreateSessionCard from "./components/CreateSessionCard";
 import DashboardHome from "./components/DashboardHome";
@@ -110,11 +111,20 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [activePage, setActivePage] = useState("dashboard");
   const [dashboardYearFilter, setDashboardYearFilter] = useState([]);
+  const [classroomRemovalAlertOpen, setClassroomRemovalAlertOpen] = useState(false);
+  const [sendingClassroomRemovalAlert, setSendingClassroomRemovalAlert] = useState(false);
+  const [classroomRemovalAlertForm, setClassroomRemovalAlertForm] = useState({
+    studentName: "",
+    classroom: "",
+    teacher: "",
+    reason: "",
+  });
   const error = authError || dataError;
   const currentEntry = newEntry.sessionId
     ? newEntry
     : { ...newEntry, sessionId: selectedSessionId };
   const isSupervisor = (profile?.role || "coordinator") === "supervisor";
+  const isTeacher = profile?.role === "teacher";
   const isAdmin = profile?.role === "admin";
   const coordinatorYearLevels = useMemo(
     () => normalizeYearLevels(profile?.year_levels ?? profile?.year_level),
@@ -134,12 +144,18 @@ export default function App() {
     [attendanceYearFilter]
   );
   const shouldScopeDashboardByYear = dashboardYearLevels.length > 0;
+  const showClassroomRemovalAlertButton =
+    Boolean(authSession) && activePage === "dashboard" && !passwordRecoveryMode;
   const pages = useMemo(
     () =>
       isSupervisor
         ? [
             { id: "sessions", label: "Detentions" },
           ]
+        : isTeacher
+          ? [
+              { id: "dashboard", label: "Dashboard" },
+            ]
         : [
             { id: "dashboard", label: "Dashboard" },
             { id: "sessions", label: "Detentions" },
@@ -148,7 +164,7 @@ export default function App() {
             { id: "attendance", label: "Attendance" },
             { id: "students", label: "Student" },
           ],
-    [isSupervisor]
+    [isSupervisor, isTeacher]
   );
 
   useEffect(() => {
@@ -171,6 +187,30 @@ export default function App() {
   function clearError() {
     setAuthError("");
     setDataError("");
+  }
+
+  function resetClassroomRemovalAlertForm() {
+    setClassroomRemovalAlertForm({
+      studentName: "",
+      classroom: "",
+      teacher:
+        String(profile?.full_name || "").trim() ||
+        String(profile?.email || "").trim() ||
+        String(authSession?.user?.email || "").trim(),
+      reason: "",
+    });
+  }
+
+  function openClassroomRemovalAlert() {
+    clearError();
+    setMessage("");
+    resetClassroomRemovalAlertForm();
+    setClassroomRemovalAlertOpen(true);
+  }
+
+  function closeClassroomRemovalAlert() {
+    if (sendingClassroomRemovalAlert) return;
+    setClassroomRemovalAlertOpen(false);
   }
 
   async function handleSubmit(e) {
@@ -211,6 +251,40 @@ export default function App() {
       setMessage("Password reset email sent.");
     } catch (err) {
       setAuthError(err.message || "Failed to send reset email.");
+    }
+  }
+
+  async function handleSendClassroomRemovalAlert() {
+    clearError();
+    setMessage("");
+    setSendingClassroomRemovalAlert(true);
+
+    try {
+      const response = await fetch("/api/classroom-removal-alert", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authSession?.access_token || ""}`,
+        },
+        body: JSON.stringify(classroomRemovalAlertForm),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setDataError(result?.error || "Failed to send classroom removal alert.");
+        return;
+      }
+
+      setMessage(
+        `Classroom removal alert sent to ${result.emailRecipients} email recipient(s) and ${result.smsRecipients} mobile recipient(s).`
+      );
+      setClassroomRemovalAlertOpen(false);
+      resetClassroomRemovalAlertForm();
+    } catch (err) {
+      setDataError(err.message || "Failed to send classroom removal alert.");
+    } finally {
+      setSendingClassroomRemovalAlert(false);
     }
   }
 
@@ -2384,10 +2458,30 @@ export default function App() {
       <AppHeader
         handleLogout={handleLogout}
         onOpenAccount={() => setActivePage("account")}
+        onOpenClassroomRemovalAlert={openClassroomRemovalAlert}
         accountActive={activePage === "account"}
         pages={!isSupervisor ? pages : []}
         activePage={activePage}
         onSelectPage={setActivePage}
+        showClassroomRemovalAlertButton={showClassroomRemovalAlertButton}
+      />
+
+      <ClassroomRemovalAlertModal
+        open={classroomRemovalAlertOpen}
+        form={classroomRemovalAlertForm}
+        setForm={setClassroomRemovalAlertForm}
+        sending={sendingClassroomRemovalAlert}
+        studentOptions={students
+          .map((student) => `${student.first_name} ${student.last_name}`.trim())
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))}
+        defaultTeacher={
+          String(profile?.full_name || "").trim() ||
+          String(profile?.email || "").trim() ||
+          String(authSession?.user?.email || "").trim()
+        }
+        onClose={closeClassroomRemovalAlert}
+        onSubmit={handleSendClassroomRemovalAlert}
       />
 
       {error ? <p style={statusErrorStyle}>{error}</p> : null}
@@ -2413,6 +2507,7 @@ export default function App() {
             <DashboardHome
               stats={dashboardStats}
               showYearFilters={!isSupervisor}
+              teacherView={isTeacher}
               availableYearLevels={availableDashboardYearLevels}
               selectedYearLevels={dashboardYearLevels}
               onToggleYearLevel={(yearLevel) =>
