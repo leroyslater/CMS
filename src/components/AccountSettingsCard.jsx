@@ -11,13 +11,18 @@ import {
 export default function AccountSettingsCard({
   profile,
   recoveryMode,
+  updatingProfile,
   updatingPassword,
+  onUpdateProfile,
   onUpdatePassword,
 }) {
+  const [fullName, setFullName] = useState(profile?.full_name || "");
+  const [email, setEmail] = useState(profile?.email || "");
+  const [mobileNumber, setMobileNumber] = useState(profile?.mobile_number || "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  async function handleSubmit(event) {
+  async function handlePasswordSubmit(event) {
     event.preventDefault();
     if (password !== confirmPassword) {
       return;
@@ -28,6 +33,15 @@ export default function AccountSettingsCard({
       setPassword("");
       setConfirmPassword("");
     }
+  }
+
+  async function handleProfileSubmit(event) {
+    event.preventDefault();
+    await onUpdateProfile({
+      fullName,
+      email,
+      mobileNumber,
+    });
   }
 
   return (
@@ -41,21 +55,51 @@ export default function AccountSettingsCard({
           : "You can update your password here. Account creation is restricted to admins."}
       </p>
       {!recoveryMode ? (
-        <div style={{ color: "#4b587c", marginBottom: 16 }}>
-          <div style={{ fontWeight: "bold", color: "#17334b", marginBottom: 4 }}>
-            {profile?.full_name || "Unnamed user"}
-          </div>
-          <div>{profile?.email || "-"}</div>
-          <div style={{ marginTop: 4 }}>
-            {profile?.role || "coordinator"}
-            {profile?.year_levels?.length ? ` · Year levels: ${profile.year_levels.join(", ")}` : ""}
-          </div>
-          {profile?.mobile_number ? (
-            <div style={{ marginTop: 4 }}>Mobile: {profile.mobile_number}</div>
-          ) : null}
-        </div>
+        <>
+          <form onSubmit={handleProfileSubmit}>
+            <input
+              style={inputStyle}
+              placeholder="Full name"
+              value={fullName}
+              onChange={(event) => setFullName(event.target.value)}
+            />
+            <input
+              style={inputStyle}
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+            <input
+              style={inputStyle}
+              placeholder="Mobile number"
+              value={mobileNumber}
+              onChange={(event) => setMobileNumber(event.target.value)}
+            />
+            <div style={{ color: "#4b587c", marginBottom: 16 }}>
+              <div style={{ marginTop: 4 }}>
+                {profile?.role || "coordinator"}
+                {profile?.year_levels?.length
+                  ? ` · Year levels: ${profile.year_levels.join(", ")}`
+                  : ""}
+              </div>
+            </div>
+            <button
+              type="submit"
+              style={buttonStyle}
+              disabled={
+                updatingProfile ||
+                !String(fullName || "").trim() ||
+                !String(email || "").trim()
+              }
+            >
+              {updatingProfile ? "Saving..." : "Save details"}
+            </button>
+          </form>
+          <div style={{ height: 18 }} />
+        </>
       ) : null}
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handlePasswordSubmit}>
         <input
           style={inputStyle}
           type="password"

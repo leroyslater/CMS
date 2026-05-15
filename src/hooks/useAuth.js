@@ -173,6 +173,15 @@ export function useAuth() {
     }
   }
 
+  async function refreshProfile() {
+    if (!authSession?.user) return;
+
+    await loadProfile({
+      ...authSession.user,
+      access_token: authSession.access_token,
+    });
+  }
+
   return {
     authSession,
     profile,
@@ -180,6 +189,7 @@ export function useAuth() {
     authError: error,
     setAuthError: setError,
     handleLogout,
+    refreshProfile,
     passwordRecoveryMode,
     setPasswordRecoveryMode,
   };

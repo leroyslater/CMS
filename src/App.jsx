@@ -38,6 +38,7 @@ export default function App() {
     authError,
     setAuthError,
     handleLogout,
+    refreshProfile,
     passwordRecoveryMode,
     setPasswordRecoveryMode,
   } = useAuth();
@@ -102,6 +103,7 @@ export default function App() {
   const [updatingTodoId, setUpdatingTodoId] = useState(null);
   const [deletingTodoId, setDeletingTodoId] = useState(null);
   const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [updatingProfile, setUpdatingProfile] = useState(false);
   const [creatingAccount, setCreatingAccount] = useState(false);
   const [accounts, setAccounts] = useState([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
@@ -317,6 +319,62 @@ export default function App() {
       return true;
     } finally {
       setUpdatingPassword(false);
+    }
+  }
+
+  async function handleUpdateOwnProfile(payload) {
+    clearError();
+    setMessage("");
+    setUpdatingProfile(true);
+
+    try {
+      const nextEmail = String(payload?.email || "").trim();
+      const nextFullName = String(payload?.fullName || "").trim();
+      const nextMobileNumber = String(payload?.mobileNumber || "").trim();
+
+      if (!nextEmail || !nextFullName) {
+        setDataError("Full name and email are required.");
+        return false;
+      }
+
+      const { error: authUpdateError } = await supabase.auth.updateUser({
+        email: nextEmail,
+        data: {
+          full_name: nextFullName,
+          role: profile?.role || "coordinator",
+          year_levels: profile?.year_levels || [],
+          mobile_number: nextMobileNumber,
+        },
+      });
+
+      if (authUpdateError) {
+        setDataError(authUpdateError.message || "Failed to update account details.");
+        return false;
+      }
+
+      await upsertTableRows(
+        "profiles",
+        [
+          {
+            id: authSession?.user?.id,
+            email: nextEmail,
+            full_name: nextFullName,
+            role: profile?.role || "coordinator",
+            year_levels: profile?.year_levels || [],
+            mobile_number: nextMobileNumber,
+          },
+        ],
+        authSession?.access_token || ""
+      );
+
+      await refreshProfile();
+      setMessage("Account details updated.");
+      return true;
+    } catch (err) {
+      setDataError(err.message || "Failed to update account details.");
+      return false;
+    } finally {
+      setUpdatingProfile(false);
     }
   }
 
@@ -2427,9 +2485,12 @@ export default function App() {
         {error ? <p style={statusErrorStyle}>{error}</p> : null}
         {message ? <p style={statusSuccessStyle}>{message}</p> : null}
         <AccountSettingsCard
+          key={`account-${profile?.id || "none"}-${profile?.email || ""}-${profile?.full_name || ""}-${profile?.mobile_number || ""}`}
           profile={profile}
           recoveryMode={passwordRecoveryMode}
+          updatingProfile={updatingProfile}
           updatingPassword={updatingPassword}
+          onUpdateProfile={handleUpdateOwnProfile}
           onUpdatePassword={handleUpdatePassword}
         />
       </div>
@@ -2464,6 +2525,7 @@ export default function App() {
         activePage={activePage}
         onSelectPage={setActivePage}
         showClassroomRemovalAlertButton={showClassroomRemovalAlertButton}
+        teacherHeaderLayout={isTeacher}
       />
 
       <ClassroomRemovalAlertModal
@@ -2554,9 +2616,12 @@ export default function App() {
           {activePage === "account" ? (
             <>
               <AccountSettingsCard
+                key={`account-${profile?.id || "none"}-${profile?.email || ""}-${profile?.full_name || ""}-${profile?.mobile_number || ""}`}
                 profile={profile}
                 recoveryMode={passwordRecoveryMode}
+                updatingProfile={updatingProfile}
                 updatingPassword={updatingPassword}
+                onUpdateProfile={handleUpdateOwnProfile}
                 onUpdatePassword={handleUpdatePassword}
               />
 
